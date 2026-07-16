@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../editor/screens/code_editor_screen.dart';
 
 class ProjectExplorerScreen extends StatefulWidget {
   final String projectName;
@@ -13,14 +14,15 @@ class ProjectExplorerScreen extends StatefulWidget {
       _ProjectExplorerScreenState();
 }
 
-class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
+class _ProjectExplorerScreenState
+    extends State<ProjectExplorerScreen> {
   bool appOpen = false;
   bool srcOpen = false;
   bool mainOpen = false;
   bool javaOpen = false;
   bool comOpen = false;
   bool hamidOpen = false;
-  bool myAppOpen = false;
+  bool myappOpen = false;
   bool resOpen = false;
 
   @override
@@ -31,7 +33,6 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
       ),
       body: ListView(
         children: [
-
           _folder(
             "app",
             appOpen,
@@ -93,19 +94,30 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
               padding: const EdgeInsets.only(left: 120),
               child: _folder(
                 "myapp",
-                myAppOpen,
-                () => setState(() => myAppOpen = !myAppOpen),
+                myappOpen,
+                () => setState(() => myappOpen = !myappOpen),
               ),
             ),
 
-          if (myAppOpen)
-            const Padding(
-              padding: EdgeInsets.only(left: 140),
+          if (myappOpen)
+            Padding(
+              padding: const EdgeInsets.only(left: 140),
               child: ListTile(
-                leading: Icon(Icons.code),
-                title: Text("MainActivity.kt"),
+                leading: const Icon(Icons.code),
+                title: const Text("MainActivity.kt"),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CodeEditorScreen(
+                        fileName: "MainActivity.kt",
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
+
           if (mainOpen)
             Padding(
               padding: const EdgeInsets.only(left: 60),
@@ -116,51 +128,6 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
               ),
             ),
 
-          if (resOpen) ...[
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("drawable"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("layout"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("mipmap"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("values"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("menu"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("xml"),
-              ),
-            ),
-          ],
-
           if (mainOpen)
             const Padding(
               padding: EdgeInsets.only(left: 60),
@@ -169,28 +136,6 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
                 title: Text("AndroidManifest.xml"),
               ),
             ),
-
-          const Divider(),
-
-          const ListTile(
-            leading: Icon(Icons.folder),
-            title: Text("gradle"),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.description),
-            title: Text("build.gradle.kts"),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.description),
-            title: Text("settings.gradle.kts"),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.description),
-            title: Text("gradle.properties"),
-          ),
         ],
       ),
     );
@@ -205,10 +150,10 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
       leading: Icon(
         open ? Icons.folder_open : Icons.folder,
       ),
-      title: Text(title),
       trailing: Icon(
         open ? Icons.expand_less : Icons.expand_more,
       ),
+      title: Text(title),
       onTap: onTap,
     );
   }
