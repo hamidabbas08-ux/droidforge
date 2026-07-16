@@ -15,6 +15,12 @@ class ProjectExplorerScreen extends StatefulWidget {
 
 class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
   bool appOpen = false;
+  bool srcOpen = false;
+  bool mainOpen = false;
+  bool javaOpen = false;
+  bool comOpen = false;
+  bool hamidOpen = false;
+  bool myAppOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -22,14 +28,13 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
       appBar: AppBar(title: Text(widget.projectName)),
       body: ListView(
         children: [
+
           ListTile(
-            leading: Icon(
-              appOpen ? Icons.folder_open : Icons.folder,
-            ),
+            leading: Icon(appOpen ? Icons.folder_open : Icons.folder),
             title: const Text("app"),
-            trailing: Icon(
-              appOpen ? Icons.expand_less : Icons.expand_more,
-            ),
+            trailing: Icon(appOpen
+                ? Icons.expand_less
+                : Icons.expand_more),
             onTap: () {
               setState(() {
                 appOpen = !appOpen;
@@ -38,22 +43,91 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
           ),
 
           if (appOpen) ...[
-            const Padding(
-              padding: EdgeInsets.only(left: 32),
+
+            Padding(
+              padding: const EdgeInsets.only(left: 24),
               child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("src"),
+                leading: Icon(srcOpen ? Icons.folder_open : Icons.folder),
+                title: const Text("src"),
+                trailing: Icon(srcOpen
+                    ? Icons.expand_less
+                    : Icons.expand_more),
+                onTap: () {
+                  setState(() {
+                    srcOpen = !srcOpen;
+                  });
+                },
               ),
             ),
+
+            if (srcOpen) ...[
+
+              Padding(
+                padding: const EdgeInsets.only(left: 48),
+                child: ListTile(
+                  leading: Icon(mainOpen ? Icons.folder_open : Icons.folder),
+                  title: const Text("main"),
+                  trailing: Icon(mainOpen
+                      ? Icons.expand_less
+                      : Icons.expand_more),
+                  onTap: () {
+                    setState(() {
+                      mainOpen = !mainOpen;
+                    });
+                  },
+                ),
+              ),
+
+              if (mainOpen) ...[
+
+                Padding(
+                  padding: const EdgeInsets.only(left: 72),
+                  child: ListTile(
+                    leading: Icon(javaOpen
+                        ? Icons.folder_open
+                        : Icons.folder),
+                    title: const Text("java"),
+                    trailing: Icon(javaOpen
+                        ? Icons.expand_less
+                        : Icons.expand_more),
+                    onTap: () {
+                      setState(() {
+                        javaOpen = !javaOpen;
+                      });
+                    },
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.only(left: 72),
+                  child: const ListTile(
+                    leading: Icon(Icons.folder),
+                    title: Text("res"),
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.only(left: 72),
+                  child: const ListTile(
+                    leading: Icon(Icons.insert_drive_file),
+                    title: Text("AndroidManifest.xml"),
+                  ),
+                ),
+
+              ],
+
+            ],
+
             const Padding(
-              padding: EdgeInsets.only(left: 32),
+              padding: EdgeInsets.only(left: 24),
               child: ListTile(
                 leading: Icon(Icons.insert_drive_file),
                 title: Text("build.gradle.kts"),
               ),
             ),
+
             const Padding(
-              padding: EdgeInsets.only(left: 32),
+              padding: EdgeInsets.only(left: 24),
               child: ListTile(
                 leading: Icon(Icons.insert_drive_file),
                 title: Text("proguard-rules.pro"),
