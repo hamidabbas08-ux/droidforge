@@ -14,8 +14,7 @@ class ProjectExplorerScreen extends StatefulWidget {
       _ProjectExplorerScreenState();
 }
 
-class _ProjectExplorerScreenState
-    extends State<ProjectExplorerScreen> {
+class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
   bool appOpen = false;
   bool srcOpen = false;
   bool mainOpen = false;
@@ -33,6 +32,7 @@ class _ProjectExplorerScreenState
       ),
       body: ListView(
         children: [
+
           _folder(
             "app",
             appOpen,
@@ -97,9 +97,7 @@ class _ProjectExplorerScreenState
                 myappOpen,
                 () => setState(() => myappOpen = !myappOpen),
               ),
-            ),
-
-          if (myappOpen)
+            ),          if (myappOpen)
             Padding(
               padding: const EdgeInsets.only(left: 140),
               child: ListTile(
@@ -128,14 +126,113 @@ class _ProjectExplorerScreenState
               ),
             ),
 
-          if (mainOpen)
+          if (resOpen) ...[
             const Padding(
-              padding: EdgeInsets.only(left: 60),
+              padding: EdgeInsets.only(left: 80),
               child: ListTile(
-                leading: Icon(Icons.description),
-                title: Text("AndroidManifest.xml"),
+                leading: Icon(Icons.folder),
+                title: Text("drawable"),
               ),
             ),
+            const Padding(
+              padding: EdgeInsets.only(left: 80),
+              child: ListTile(
+                leading: Icon(Icons.folder),
+                title: Text("layout"),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 80),
+              child: ListTile(
+                leading: Icon(Icons.folder),
+                title: Text("mipmap"),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 80),
+              child: ListTile(
+                leading: Icon(Icons.folder),
+                title: Text("values"),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 80),
+              child: ListTile(
+                leading: Icon(Icons.folder),
+                title: Text("menu"),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 80),
+              child: ListTile(
+                leading: Icon(Icons.folder),
+                title: Text("xml"),
+              ),
+            ),
+          ],
+
+          Padding(
+            padding: const EdgeInsets.only(left: 60),
+            child: ListTile(
+              leading: const Icon(Icons.description),
+              title: const Text("AndroidManifest.xml"),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CodeEditorScreen(
+                      fileName: "AndroidManifest.xml",
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),          const Divider(),
+
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: const Text("build.gradle.kts"),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CodeEditorScreen(
+                    fileName: "build.gradle.kts",
+                  ),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: const Text("settings.gradle.kts"),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CodeEditorScreen(
+                    fileName: "settings.gradle.kts",
+                  ),
+                ),
+              );
+            },
+          ),
+
+          ListTile(
+            leading: const Icon(Icons.description),
+            title: const Text("gradle.properties"),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CodeEditorScreen(
+                    fileName: "gradle.properties",
+                  ),
+                ),
+              );
+            },
+          ),
         ],
       ),
     );
