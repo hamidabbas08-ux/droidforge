@@ -5,34 +5,57 @@ class ProjectService {
     required String projectName,
     required String packageName,
   }) async {
-    final root = Directory("/storage/emulated/0/DroidForgeProjects/$projectName");
+    final root =
+        Directory("/storage/emulated/0/DroidForgeProjects/$projectName");
 
-    if (!await root.exists()) {
-      await root.create(recursive: true);
+    await root.create(recursive: true);
+
+    final folders = [
+      "app",
+      "app/src",
+      "app/src/main",
+      "app/src/main/java",
+      "app/src/main/res",
+      "app/src/main/res/layout",
+      "app/src/main/res/drawable",
+      "app/src/main/res/mipmap",
+      "app/src/main/res/values",
+      "app/src/main/assets",
+      "gradle",
+      "gradle/wrapper",
+    ];
+
+    for (final folder in folders) {
+      await Directory("${root.path}/$folder").create(recursive: true);
     }
 
-    await Directory("${root.path}/app").create(recursive: true);
-    await Directory("${root.path}/gradle").create(recursive: true);
-    await Directory("${root.path}/src").create(recursive: true);
-    await Directory("${root.path}/res").create(recursive: true);
-
-    await File("${root.path}/AndroidManifest.xml").writeAsString(
-      "<manifest package=\"$packageName\"></manifest>",
-    );
-
-    await File("${root.path}/build.gradle.kts").writeAsString("// build.gradle");
+    await File("${root.path}/README.md")
+        .writeAsString("# $projectName");
 
     await File("${root.path}/settings.gradle.kts")
-        .writeAsString("rootProject.name=\"$projectName\"");
+        .writeAsString('rootProject.name="$projectName"');
 
-    await File("${root.path}/gradle.properties").writeAsString("");
+    await File("${root.path}/build.gradle.kts")
+        .writeAsString("// Root Build File");
 
-    await File("${root.path}/MainActivity.kt").writeAsString("""
+    await File("${root.path}/gradle.properties")
+        .writeAsString("");
+
+    await File("${root.path}/app/src/main/AndroidManifest.xml")
+        .writeAsString('''
+<manifest package="$packageName">
+    <application
+        android:label="$projectName">
+    </application>
+</manifest>
+''');
+
+    await File("${root.path}/app/src/main/java/MainActivity.kt")
+        .writeAsString('''
 package $packageName
 
-fun main() {
-
+class MainActivity {
 }
-""");
+''');
   }
 }
