@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-class ProjectExplorerScreen extends StatelessWidget {
+class ProjectExplorerScreen extends StatefulWidget {
   final String projectName;
 
   const ProjectExplorerScreen({
@@ -9,30 +9,76 @@ class ProjectExplorerScreen extends StatelessWidget {
   });
 
   @override
+  State<ProjectExplorerScreen> createState() =>
+      _ProjectExplorerScreenState();
+}
+
+class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
+  bool appOpen = false;
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(projectName),
-      ),
+      appBar: AppBar(title: Text(widget.projectName)),
       body: ListView(
-        children: const [
+        children: [
           ListTile(
-            leading: Icon(Icons.folder),
-            title: Text("app"),
+            leading: Icon(
+              appOpen ? Icons.folder_open : Icons.folder,
+            ),
+            title: const Text("app"),
+            trailing: Icon(
+              appOpen ? Icons.expand_less : Icons.expand_more,
+            ),
+            onTap: () {
+              setState(() {
+                appOpen = !appOpen;
+              });
+            },
           ),
-          ListTile(
+
+          if (appOpen) ...[
+            const Padding(
+              padding: EdgeInsets.only(left: 32),
+              child: ListTile(
+                leading: Icon(Icons.folder),
+                title: Text("src"),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 32),
+              child: ListTile(
+                leading: Icon(Icons.insert_drive_file),
+                title: Text("build.gradle.kts"),
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 32),
+              child: ListTile(
+                leading: Icon(Icons.insert_drive_file),
+                title: Text("proguard-rules.pro"),
+              ),
+            ),
+          ],
+
+          const Divider(),
+
+          const ListTile(
             leading: Icon(Icons.folder),
             title: Text("gradle"),
           ),
-          ListTile(
+
+          const ListTile(
             leading: Icon(Icons.insert_drive_file),
             title: Text("build.gradle.kts"),
           ),
-          ListTile(
+
+          const ListTile(
             leading: Icon(Icons.insert_drive_file),
             title: Text("settings.gradle.kts"),
           ),
-          ListTile(
+
+          const ListTile(
             leading: Icon(Icons.insert_drive_file),
             title: Text("gradle.properties"),
           ),
