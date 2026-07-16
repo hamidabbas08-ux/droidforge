@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../../editor/screens/code_editor_screen.dart';
+import '../services/project_service.dart';
+import 'project_popup_menu.dart';
 
 class ProjectExplorerScreen extends StatefulWidget {
   final String projectName;
@@ -14,7 +17,8 @@ class ProjectExplorerScreen extends StatefulWidget {
       _ProjectExplorerScreenState();
 }
 
-class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
+class _ProjectExplorerScreenState
+    extends State<ProjectExplorerScreen> {
   bool appOpen = false;
   bool srcOpen = false;
   bool mainOpen = false;
@@ -24,15 +28,48 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
   bool myappOpen = false;
   bool resOpen = false;
 
-  @override
+  Future<void> _newFile(String name) async {
+    await ProjectService.createFile(
+      "/storage/emulated/0/DroidForgeProjects/${widget.projectName}",
+      name,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("$name created"),
+      ),
+    );
+  }
+
+  Future<void> _newFolder(String name) async {
+    await ProjectService.createFolder(
+      "/storage/emulated/0/DroidForgeProjects/${widget.projectName}",
+      name,
+    );
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("$name created"),
+      ),
+    );
+  }  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.projectName),
+        actions: [
+          ProjectPopupMenu(
+            onCreateFile: _newFile,
+            onCreateFolder: _newFolder,
+          ),
+        ],
       ),
       body: ListView(
         children: [
-
           _folder(
             "app",
             appOpen,
@@ -77,9 +114,7 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
                 comOpen,
                 () => setState(() => comOpen = !comOpen),
               ),
-            ),
-
-          if (comOpen)
+            ),          if (comOpen)
             Padding(
               padding: const EdgeInsets.only(left: 100),
               child: _folder(
@@ -97,7 +132,9 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
                 myappOpen,
                 () => setState(() => myappOpen = !myappOpen),
               ),
-            ),          if (myappOpen)
+            ),
+
+          if (myappOpen)
             Padding(
               padding: const EdgeInsets.only(left: 140),
               child: ListTile(
@@ -124,9 +161,7 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
                 resOpen,
                 () => setState(() => resOpen = !resOpen),
               ),
-            ),
-
-          if (resOpen) ...[
+            ),          if (resOpen) ...[
             const Padding(
               padding: EdgeInsets.only(left: 80),
               child: ListTile(
@@ -187,9 +222,9 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
                 );
               },
             ),
-          ),          const Divider(),
+          ),
 
-          ListTile(
+          const Divider(),          ListTile(
             leading: const Icon(Icons.description),
             title: const Text("build.gradle.kts"),
             onTap: () {
