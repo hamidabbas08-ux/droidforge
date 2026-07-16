@@ -34,42 +34,31 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
               border: OutlineInputBorder(),
             ),
           ),
-          const SizedBox(height: 20),
-
-          const ListTile(
-            leading: Icon(Icons.android),
-            title: Text("Language"),
-            subtitle: Text("Kotlin"),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.settings),
-            title: Text("Minimum SDK"),
-            subtitle: Text("Android 7.0 (API 24)"),
-          ),
-
-          const ListTile(
-            leading: Icon(Icons.settings_applications),
-            title: Text("Target SDK"),
-            subtitle: Text("Android 16 (API 36)"),
-          ),
-
           const SizedBox(height: 24),
-
           ElevatedButton(
             onPressed: () async {
-              await ProjectService.createProject(
-                projectName: projectController.text.trim(),
-                packageName: packageController.text.trim(),
-              );
+              try {
+                await ProjectService.createProject(
+                  projectName: projectController.text.trim(),
+                  packageName: packageController.text.trim(),
+                );
 
-              if (!context.mounted) return;
+                if (!context.mounted) return;
 
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Project Created Successfully"),
-                ),
-              );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Project Created Successfully"),
+                  ),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(e.toString()),
+                  ),
+                );
+              }
             },
             child: const Text("Create Project"),
           ),
