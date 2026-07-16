@@ -1,12 +1,20 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class ProjectService {
   static Future<void> createProject({
     required String projectName,
     required String packageName,
   }) async {
-    final root =
-        Directory("/storage/emulated/0/DroidForgeProjects/$projectName");
+    final base = await getExternalStorageDirectory();
+
+    if (base == null) {
+      throw Exception("Storage not available");
+    }
+
+    final root = Directory(
+      "${base.path}/DroidForgeProjects/$projectName",
+    );
 
     await root.create(recursive: true);
 
@@ -44,8 +52,7 @@ class ProjectService {
     await File("${root.path}/app/src/main/AndroidManifest.xml")
         .writeAsString('''
 <manifest package="$packageName">
-    <application
-        android:label="$projectName">
+    <application android:label="$projectName">
     </application>
 </manifest>
 ''');
