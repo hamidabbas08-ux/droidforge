@@ -39,21 +39,33 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () async {
-                await ProjectService.createProject(
-                  projectName: projectController.text.trim(),
-                  packageName: packageController.text.trim(),
-                );
+                try {
+                  await ProjectService.createProject(
+                    projectName: projectController.text.trim(),
+                    packageName: packageController.text.trim(),
+                  );
 
-                if (!context.mounted) return;
+                  if (!context.mounted) return;
 
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => ProjectExplorerScreen(
-                      projectName: projectController.text.trim(),
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProjectExplorerScreen(
+                        projectName: projectController.text.trim(),
+                      ),
                     ),
-                  ),
-                );
+                  );
+                } catch (e) {
+                  debugPrint(e.toString());
+
+                  if (!context.mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e.toString()),
+                    ),
+                  );
+                }
               },
               child: const Text("Create Project"),
             ),
