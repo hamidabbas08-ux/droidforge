@@ -1,6 +1,14 @@
 import 'dart:io';
 
 class ProjectService {
+  static Future<void> createProject(String projectName) async {
+    final root = Directory('/storage/emulated/0/DroidForgeProjects/$projectName');
+
+    if (!await root.exists()) {
+      await root.create(recursive: true);
+    }
+  }
+
   static Future<void> createFolder(
     String parent,
     String name,
