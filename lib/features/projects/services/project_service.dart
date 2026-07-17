@@ -1,7 +1,9 @@
 import 'dart:io';
+
 import 'package:path_provider/path_provider.dart';
 
 import '../models/file_tree_node.dart';
+import '../templates/android_templates.dart';
 
 class ProjectService {
   static Future<Directory> _projectsRoot() async {
@@ -20,12 +22,16 @@ class ProjectService {
     return root;
   }
 
-  static Future<Directory> getProjectDirectory(String projectName) async {
+  static Future<Directory> getProjectDirectory(
+    String projectName,
+  ) async {
     final root = await _projectsRoot();
     return Directory("${root.path}/$projectName");
   }
 
-  static Future<FileTreeNode> loadProjectTree(String projectName) async {
+  static Future<FileTreeNode> loadProjectTree(
+    String projectName,
+  ) async {
     final project = await getProjectDirectory(projectName);
 
     if (!await project.exists()) {
@@ -47,29 +53,66 @@ class ProjectService {
       await project.create(recursive: true);
     }
 
-    await Directory("${project.path}/app/src/main/java")
-        .create(recursive: true);
+    final javaPath = packageName.replaceAll('.', '/');
 
-    await Directory("${project.path}/res")
-        .create(recursive: true);
+    await Directory(
+      "${project.path}/app/src/main/java/$javaPath",
+    ).create(recursive: true);
 
-    await File("${project.path}/AndroidManifest.xml")
-        .create(recursive: true);
+    await Directory(
+      "${project.path}/app/src/main/res",
+    ).create(recursive: true);
 
-    await File("${project.path}/build.gradle.kts")
-        .create(recursive: true);
+    await Directory(
+      "${project.path}/app/src/main/assets",
+    ).create(recursive: true);
 
-    await File("${project.path}/settings.gradle.kts")
-        .create(recursive: true);
+    await File(
+      "${project.path}/app/src/main/AndroidManifest.xml",
+    ).writeAsString(
+      AndroidTemplates.manifest(
+        packageName: packageName,
+        projectName: projectName,
+      ),
+    );    await File(
+      "${project.path}/app/src/main/java/$javaPath/MainActivity.kt",
+    ).writeAsString(
+      AndroidTemplates.mainActivity(
+        packageName: packageName,
+      ),
+    );
 
-    await File("${project.path}/gradle.properties")
-        .create(recursive: true);
+    await File(
+      "${project.path}/build.gradle.kts",
+    ).writeAsString(
+      AndroidTemplates.rootBuildGradle(),
+    );
 
-    await File("${project.path}/MainActivity.kt")
-        .create(recursive: true);
+    await File(
+      "${project.path}/app/build.gradle.kts",
+    ).writeAsString(
+      AndroidTemplates.appBuildGradle(
+        packageName: packageName,
+      ),
+    );
 
-    await File("${project.path}/package.txt")
-        .writeAsString(packageName);
+    await File(
+      "${project.path}/settings.gradle.kts",
+    ).writeAsString(
+      AndroidTemplates.settingsGradle(
+        projectName: projectName,
+      ),
+    );
+
+    await File(
+      "${project.path}/gradle.properties",
+    ).writeAsString(
+      AndroidTemplates.gradleProperties(),
+    );
+
+    await File(
+      "${project.path}/package.txt",
+    ).writeAsString(packageName);
   }
 
   static Future<void> createFolder(
@@ -92,9 +135,7 @@ class ProjectService {
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
-  }
-
-  static Future<void> rename(
+  }  static Future<void> rename(
     String path,
     String newName,
   ) async {
@@ -110,11 +151,15 @@ class ProjectService {
     }
   }
 
-  static Future<void> delete(String path) async {
+  static Future<void> delete(
+    String path,
+  ) async {
     final entity = FileSystemEntity.typeSync(path);
 
     if (entity == FileSystemEntityType.directory) {
-      await Directory(path).delete(recursive: true);
+      await Directory(path).delete(
+        recursive: true,
+      );
     } else {
       await File(path).delete();
     }
