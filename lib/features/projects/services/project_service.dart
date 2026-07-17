@@ -64,6 +64,30 @@ class ProjectService {
     ).create(recursive: true);
 
     await Directory(
+      "${project.path}/app/src/main/res/values",
+    ).create(recursive: true);
+
+    await Directory(
+      "${project.path}/app/src/main/res/layout",
+    ).create(recursive: true);
+
+    await Directory(
+      "${project.path}/app/src/main/res/drawable",
+    ).create(recursive: true);
+
+    await Directory(
+      "${project.path}/app/src/main/res/mipmap",
+    ).create(recursive: true);
+
+    await Directory(
+      "${project.path}/app/src/main/res/xml",
+    ).create(recursive: true);
+
+    await Directory(
+      "${project.path}/app/src/main/res/font",
+    ).create(recursive: true);
+
+    await Directory(
       "${project.path}/app/src/main/assets",
     ).create(recursive: true);
 
@@ -108,6 +132,32 @@ class ProjectService {
       "${project.path}/gradle.properties",
     ).writeAsString(
       AndroidTemplates.gradleProperties(),
+    );
+
+    await File(
+      "${project.path}/app/src/main/res/values/colors.xml",
+    ).writeAsString(
+      AndroidTemplates.colorsXml(),
+    );
+
+    await File(
+      "${project.path}/app/src/main/res/values/strings.xml",
+    ).writeAsString(
+      AndroidTemplates.stringsXml(
+        projectName: projectName,
+      ),
+    );
+
+    await File(
+      "${project.path}/app/src/main/res/values/themes.xml",
+    ).writeAsString(
+      AndroidTemplates.themesXml(),
+    );
+
+    await File(
+      "${project.path}/app/src/main/res/layout/activity_main.xml",
+    ).writeAsString(
+      AndroidTemplates.activityMainXml(),
     );
 
     await File(

@@ -20,7 +20,6 @@ class AndroidTemplates {
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
-
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
@@ -48,7 +47,9 @@ class MainActivity : AppCompatActivity() {
     }
 
 }
-''';  static String settingsGradle({
+''';
+
+  static String settingsGradle({
     required String projectName,
   }) =>
       '''
@@ -82,7 +83,9 @@ plugins {
     id("com.android.application") version "8.7.0" apply false
     id("org.jetbrains.kotlin.android") version "2.0.21" apply false
 }
-''';  static String appBuildGradle({
+''';
+
+  static String appBuildGradle({
     required String packageName,
   }) =>
       '''
@@ -135,5 +138,51 @@ dependencies {
 org.gradle.jvmargs=-Xmx4G
 android.useAndroidX=true
 android.enableJetifier=true
+''';
+
+  static String colorsXml() =>
+      '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="primary">#6750A4</color>
+</resources>
+''';
+
+  static String stringsXml({
+    required String projectName,
+  }) =>
+      '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">$projectName</string>
+</resources>
+''';
+
+  static String themesXml() =>
+      '''
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.App" parent="Theme.Material3.DayNight.NoActionBar"/>
+</resources>
+''';
+
+  static String activityMainXml() =>
+      '''
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hello from DroidForge!"
+        android:textSize="24sp"/>
+
+</LinearLayout>
 ''';
 }
