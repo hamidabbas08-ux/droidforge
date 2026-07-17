@@ -1,18 +1,19 @@
 class AndroidTemplates {
   static String manifest({
     required String packageName,
-    required String projectName,
-  }) =>
-      '''
+    required String appName,
+  }) {
+    return '''
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="$packageName">
 
     <application
         android:allowBackup="true"
+        android:label="$appName"
         android:icon="@mipmap/ic_launcher"
-        android:label="$projectName"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Material3.DayNight.NoActionBar">
+        android:theme="@style/Theme.App">
 
         <activity
             android:name=".MainActivity"
@@ -29,11 +30,10 @@ class AndroidTemplates {
 
 </manifest>
 ''';
+  }
 
-  static String mainActivity({
-    required String packageName,
-  }) =>
-      '''
+  static String mainActivity({required String packageName}) {
+    return '''
 package $packageName
 
 import android.os.Bundle
@@ -45,50 +45,32 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
     }
-
 }
 ''';
+  }
 
-  static String settingsGradle({
-    required String projectName,
-  }) =>
-      '''
-pluginManagement {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
+  static String activityMain() {
+    return '''
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center"
+    android:orientation="vertical">
 
-dependencyResolutionManagement {
-    repositoriesMode.set(
-        RepositoriesMode.FAIL_ON_PROJECT_REPOS
-    )
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hello Android!"
+        android:textSize="24sp"/>
 
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
-
-rootProject.name = "$projectName"
-
-include(":app")
+</LinearLayout>
 ''';
+  }
 
-  static String rootBuildGradle() =>
-      '''
-plugins {
-    id("com.android.application") version "8.7.0" apply false
-    id("org.jetbrains.kotlin.android") version "2.0.21" apply false
-}
-''';
-
-  static String appBuildGradle({
-    required String packageName,
-  }) =>
-      '''
+  static String appBuildGradle({required String packageName}) {
+    return '''
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -96,23 +78,19 @@ plugins {
 
 android {
     namespace = "$packageName"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "$packageName"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
 
     buildTypes {
         release {
-            minifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = false
         }
     }
 
@@ -127,62 +105,133 @@ android {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core-ktx:1.17.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("com.google.android.material:material:1.12.0")
 }
 ''';
+  }
 
-  static String gradleProperties() =>
-      '''
-org.gradle.jvmargs=-Xmx4G
+  static String rootBuildGradle() {
+    return '''
+plugins {
+    id("com.android.application") version "8.13.0" apply false
+    id("org.jetbrains.kotlin.android") version "2.2.10" apply false
+}
+''';
+  }
+
+  static String settingsGradle({required String appName}) {
+    return '''
+rootProject.name = "$appName"
+include(":app")
+''';
+  }
+
+  static String gradleProperties() {
+    return '''
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
 android.useAndroidX=true
-android.enableJetifier=true
+android.nonTransitiveRClass=true
+kotlin.code.style=official
 ''';
+  }
 
-  static String colorsXml() =>
-      '''
-<?xml version="1.0" encoding="utf-8"?>
+  static String stringsXml({required String appName}) {
+    return '''
 <resources>
-    <color name="black">#FF000000</color>
-    <color name="white">#FFFFFFFF</color>
-    <color name="primary">#6750A4</color>
+    <string name="app_name">$appName</string>
 </resources>
 ''';
+  }
 
-  static String stringsXml({
-    required String projectName,
-  }) =>
-      '''
+  static String colorsXml() {
+    return '''
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">$projectName</string>
+    <color name="purple_500">#6200EE</color>
+    <color name="purple_700">#3700B3</color>
+    <color name="teal_200">#03DAC5</color>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
 </resources>
 ''';
+  }
 
-  static String themesXml() =>
-      '''
+  static String themesXml() {
+    return '''
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.App" parent="Theme.Material3.DayNight.NoActionBar"/>
 </resources>
 ''';
+  }
 
-  static String activityMainXml() =>
-      '''
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:gravity="center"
-    android:orientation="vertical">
+  static String libsVersionsToml() {
+    return '''
+[versions]
+agp = "8.13.0"
+kotlin = "2.2.10"
+coreKtx = "1.17.0"
+appcompat = "1.7.1"
+material = "1.12.0"
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Hello from DroidForge!"
-        android:textSize="24sp"/>
+[libraries]
+androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
+androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
+material = { module = "com.google.android.material:material", version.ref = "material" }
 
-</LinearLayout>
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 ''';
+  }
+
+  static String gradleWrapperProperties() {
+    return '''
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\\://services.gradle.org/distributions/gradle-8.13-bin.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+''';
+  }
+
+  static String proguardRules() {
+    return '''
+# Project specific ProGuard rules.
+
+# Keep line numbers for better stack traces.
+-keepattributes SourceFile,LineNumberTable
+
+# Preserve annotations.
+-keepattributes *Annotation*
+
+# Uncomment if you enable code shrinking.
+#-dontobfuscate
+#-dontoptimize
+''';
+  }
+
+  static String gitignore() {
+    return '''
+.gradle/
+build/
+captures/
+local.properties
+
+*.iml
+*.log
+
+.idea/
+.DS_Store
+
+/app/release/
+/app/debug/
+
+.kotlin/
+.cxx/
+.externalNativeBuild/
+''';
+  }
 }
