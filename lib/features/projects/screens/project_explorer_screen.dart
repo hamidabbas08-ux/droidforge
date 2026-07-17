@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../editor/screens/code_editor_screen.dart';
+import '../models/file_tree_node.dart';
 import '../services/project_service.dart';
+import '../widgets/file_tree_widget.dart';
 import 'project_popup_menu.dart';
 
 class ProjectExplorerScreen extends StatefulWidget {
@@ -19,44 +21,74 @@ class ProjectExplorerScreen extends StatefulWidget {
 
 class _ProjectExplorerScreenState
     extends State<ProjectExplorerScreen> {
-  bool appOpen = false;
-  bool srcOpen = false;
-  bool mainOpen = false;
-  bool javaOpen = false;
-  bool comOpen = false;
-  bool hamidOpen = false;
-  bool myappOpen = false;
-  bool resOpen = false;
+
+  FileTreeNode? tree;
+
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _reloadTree();
+  }
+
+  Future<void> _reloadTree() async {
+    setState(() {
+      loading = true;
+    });
+
+    try {
+      final result =
+          await ProjectService.loadProjectTree(
+        widget.projectName,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        tree = result;
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        loading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString(),
+          ),
+        ),
+      );
+    }
+  }
 
   Future<void> _newFile(String name) async {
+    if (tree == null) return;
+
     await ProjectService.createFile(
-      "/storage/emulated/0/DroidForgeProjects/${widget.projectName}",
+      tree!.path,
       name,
     );
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("$name created"),
-      ),
-    );
+    await _reloadTree();
   }
 
   Future<void> _newFolder(String name) async {
+    if (tree == null) return;
+
     await ProjectService.createFolder(
-      "/storage/emulated/0/DroidForgeProjects/${widget.projectName}",
+      tree!.path,
       name,
     );
 
-    if (!mounted) return;
+    await _reloadTree();
+  }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("$name created"),
-      ),
-    );
-  }  @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -68,225 +100,49 @@ class _ProjectExplorerScreenState
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          _folder(
-            "app",
-            appOpen,
-            () => setState(() => appOpen = !appOpen),
-          ),
+      body: Builder(
+        builder: (context) {
 
-          if (appOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 20),
-              child: _folder(
-                "src",
-                srcOpen,
-                () => setState(() => srcOpen = !srcOpen),
-              ),
-            ),
+          if (loading) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          }
 
-          if (srcOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 40),
-              child: _folder(
-                "main",
-                mainOpen,
-                () => setState(() => mainOpen = !mainOpen),
+          if (tree == null) {
+            return const Center(
+              child: Text(
+                "Project not found",
               ),
-            ),
-
-          if (mainOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 60),
-              child: _folder(
-                "java",
-                javaOpen,
-                () => setState(() => javaOpen = !javaOpen),
-              ),
-            ),
-
-          if (javaOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 80),
-              child: _folder(
-                "com",
-                comOpen,
-                () => setState(() => comOpen = !comOpen),
-              ),
-            ),          if (comOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 100),
-              child: _folder(
-                "hamid",
-                hamidOpen,
-                () => setState(() => hamidOpen = !hamidOpen),
-              ),
-            ),
-
-          if (hamidOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 120),
-              child: _folder(
-                "myapp",
-                myappOpen,
-                () => setState(() => myappOpen = !myappOpen),
-              ),
-            ),
-
-          if (myappOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 140),
-              child: ListTile(
-                leading: const Icon(Icons.code),
-                title: const Text("MainActivity.kt"),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const CodeEditorScreen(
-                        fileName: "MainActivity.kt",
+            );
+          }          return RefreshIndicator(
+            onRefresh: _reloadTree,
+            child: ListView(
+              padding: const EdgeInsets.all(8),
+              children: [
+                FileTreeWidget(
+                  node: tree!,
+                  onOpenFile: (node) async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CodeEditorScreen(
+                          fileName: node.path,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
+                    );
 
-          if (mainOpen)
-            Padding(
-              padding: const EdgeInsets.only(left: 60),
-              child: _folder(
-                "res",
-                resOpen,
-                () => setState(() => resOpen = !resOpen),
-              ),
-            ),          if (resOpen) ...[
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("drawable"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("layout"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("mipmap"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("values"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("menu"),
-              ),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 80),
-              child: ListTile(
-                leading: Icon(Icons.folder),
-                title: Text("xml"),
-              ),
-            ),
-          ],
-
-          Padding(
-            padding: const EdgeInsets.only(left: 60),
-            child: ListTile(
-              leading: const Icon(Icons.description),
-              title: const Text("AndroidManifest.xml"),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const CodeEditorScreen(
-                      fileName: "AndroidManifest.xml",
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const Divider(),          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text("build.gradle.kts"),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CodeEditorScreen(
-                    fileName: "build.gradle.kts",
-                  ),
+                    if (mounted) {
+                      _reloadTree();
+                    }
+                  },
+                  onRefresh: _reloadTree,
                 ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text("settings.gradle.kts"),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CodeEditorScreen(
-                    fileName: "settings.gradle.kts",
-                  ),
-                ),
-              );
-            },
-          ),
-
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text("gradle.properties"),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const CodeEditorScreen(
-                    fileName: "gradle.properties",
-                  ),
-                ),
-              );
-            },
-          ),
-        ],
+              ],
+            ),
+          );
+        },
       ),
-    );
-  }
-
-  Widget _folder(
-    String title,
-    bool open,
-    VoidCallback onTap,
-  ) {
-    return ListTile(
-      leading: Icon(
-        open ? Icons.folder_open : Icons.folder,
-      ),
-      trailing: Icon(
-        open ? Icons.expand_less : Icons.expand_more,
-      ),
-      title: Text(title),
-      onTap: onTap,
     );
   }
 }
