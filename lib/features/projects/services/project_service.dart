@@ -1,41 +1,53 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 class ProjectService {
-  static Future<void> createProject({
-    required String projectName,
-    required String packageName,
-  }) async {
-    final root =
-        Directory('/storage/emulated/0/DroidForgeProjects/$projectName');
+  static Future<Directory> _projectsRoot() async {
+    final base = await getExternalStorageDirectory();
+
+    if (base == null) {
+      throw Exception("External storage not available");
+    }
+
+    final root = Directory("${base.path}/DroidForgeProjects");
 
     if (!await root.exists()) {
       await root.create(recursive: true);
     }
 
-    await Directory('${root.path}/lib').create(recursive: true);
-    await Directory('${root.path}/android').create(recursive: true);
-    await Directory('${root.path}/assets').create(recursive: true);
+    return root;
+  }
 
-    final pubspec = File('${root.path}/pubspec.yaml');
-    if (!await pubspec.exists()) {
-      await pubspec.writeAsString('''
-name: ${projectName.toLowerCase()}
-description: Created by DroidForge
+  static Future<void> createProject({
+    required String projectName,
+    required String packageName,
+  }) async {
+    final root = await _projectsRoot();
 
-environment:
-  sdk: ">=3.0.0 <4.0.0"
-''');
+    final project = Directory("${root.path}/$projectName");
+
+    if (!await project.exists()) {
+      await project.create(recursive: true);
     }
 
-    final package = File('${root.path}/package.txt');
-    await package.writeAsString(packageName);
+    await Directory("${project.path}/app/src/main/java").create(recursive: true);
+    await Directory("${project.path}/res").create(recursive: true);
+
+    await File("${project.path}/AndroidManifest.xml").create(recursive: true);
+    await File("${project.path}/build.gradle.kts").create(recursive: true);
+    await File("${project.path}/settings.gradle.kts").create(recursive: true);
+    await File("${project.path}/gradle.properties").create(recursive: true);
+    await File("${project.path}/MainActivity.kt").create(recursive: true);
+
+    await File("${project.path}/package.txt").writeAsString(packageName);
   }
 
   static Future<void> createFolder(
     String parent,
     String name,
   ) async {
-    final dir = Directory('$parent/$name');
+    final dir = Directory("$parent/$name");
+
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
@@ -45,7 +57,8 @@ environment:
     String parent,
     String name,
   ) async {
-    final file = File('$parent/$name');
+    final file = File("$parent/$name");
+
     if (!await file.exists()) {
       await file.create(recursive: true);
     }
