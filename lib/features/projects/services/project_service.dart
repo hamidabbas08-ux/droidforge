@@ -1,12 +1,13 @@
 import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/file_tree_node.dart';
 import '../templates/android_templates.dart';
 
 class ProjectService {
   static Future<Directory> _projectsRoot() async {
-    final home = Platform.environment['HOME'] ?? '.';
-    final root = Directory('$home/DroidForgeProjects');
+    final dir = await getApplicationDocumentsDirectory();
+    final root = Directory("${dir.path}/DroidForgeProjects");
 
     if (!await root.exists()) {
       await root.create(recursive: true);
