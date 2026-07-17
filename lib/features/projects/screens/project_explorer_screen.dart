@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../editor/screens/code_editor_screen.dart';
 import '../models/file_tree_node.dart';
 import '../services/project_service.dart';
 import '../widgets/file_tree_widget.dart';
@@ -21,9 +20,7 @@ class ProjectExplorerScreen extends StatefulWidget {
 
 class _ProjectExplorerScreenState
     extends State<ProjectExplorerScreen> {
-
   FileTreeNode? tree;
-
   bool loading = true;
 
   @override
@@ -58,9 +55,7 @@ class _ProjectExplorerScreenState
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            e.toString(),
-          ),
+          content: Text(e.toString()),
         ),
       );
     }
@@ -102,7 +97,6 @@ class _ProjectExplorerScreenState
       ),
       body: Builder(
         builder: (context) {
-
           if (loading) {
             return const Center(
               child: CircularProgressIndicator(),
@@ -111,31 +105,17 @@ class _ProjectExplorerScreenState
 
           if (tree == null) {
             return const Center(
-              child: Text(
-                "Project not found",
-              ),
+              child: Text("Project not found"),
             );
-          }          return RefreshIndicator(
+          }
+
+          return RefreshIndicator(
             onRefresh: _reloadTree,
             child: ListView(
               padding: const EdgeInsets.all(8),
               children: [
                 FileTreeWidget(
                   node: tree!,
-                  onOpenFile: (node) async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => CodeEditorScreen(
-                          fileName: node.path,
-                        ),
-                      ),
-                    );
-
-                    if (mounted) {
-                      _reloadTree();
-                    }
-                  },
                   onRefresh: _reloadTree,
                 ),
               ],
