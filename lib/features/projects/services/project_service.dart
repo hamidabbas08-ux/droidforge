@@ -86,6 +86,10 @@ class ProjectService {
     );
 
     if (manifest.trim().isEmpty) {
+    print("PROJECT PATH: ${project.path}");
+    print("MANIFEST LENGTH: ${manifest.length}");
+    print(manifest.substring(0, manifest.length > 80 ? 80 : manifest.length));
+
       throw Exception(
         "AndroidManifest template is empty",
       );
