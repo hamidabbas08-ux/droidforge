@@ -76,7 +76,7 @@ class JdkService {
       return;
     }
 
-    if (!Platform.Isandroid) {
+    if (!Platform.isAndroid) {
       throw UnsupportedError(
         'DroidForge JDK installation currently requires the Linux/Ubuntu runtime.',
       );
