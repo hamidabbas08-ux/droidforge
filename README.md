@@ -45,3 +45,7 @@ The Linux packages published by Google may contain x86-64 native binaries.
 On an ARM64 phone/PRoot environment, `sdkmanager` can work through Java while
 native tools such as `adb`, `aapt2`, or `zipalign` can require an ARM64 build or
 an x86-64 translation layer.
+
+## v4 execution-engine foundation
+
+This build adds an Execution Environment screen and a central execution engine abstraction for Android local shell, direct Linux, Termux bridge, and Ubuntu PRoot modes. Direct Linux and Android local-shell execution are implemented. Termux/Ubuntu bridge modes are intentionally guarded until the native bridge is added, because Android APK, Termux, and PRoot Ubuntu are separate sandboxes.
