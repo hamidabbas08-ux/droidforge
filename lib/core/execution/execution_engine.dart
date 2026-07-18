@@ -22,16 +22,16 @@ class ExecutionResult {
 class ExecutionEngine {
   static Future<ExecutionMode> resolvedMode() async {
     final saved = await ExecutionSettings.load();
-    if (saved != ExecutionMode.automatic) return saved;
-    if (Platform.isLinux) return ExecutionMode.linuxDirect;
-    if (Platform.isAndroid) return ExecutionMode.androidLocal;
-    return ExecutionMode.automatic;
+    if (!Platform.isAndroid) {
+      throw UnsupportedError('DroidForge is configured for Android only.');
+    }
+    return ExecutionMode.androidLocal;
   }
 
   static Future<String> supportMessage() async {
     final mode = await resolvedMode();
     return switch (mode) {
-      ExecutionMode.linuxDirect => 'Commands run directly in Linux/Ubuntu.',
+      ExecutionMode.linuxDirect => 'Linux mode is disabled in this Android-only build.',
       ExecutionMode.androidLocal =>
         'Android local mode can run /system/bin/sh commands, but it cannot access Termux or Ubuntu files.',
       ExecutionMode.termuxBridge =>
@@ -75,7 +75,7 @@ class ExecutionEngine {
       case ExecutionMode.prootUbuntu:
         throw UnsupportedError(
           'The Termux/Ubuntu bridge is selected but is not installed in this build yet. '
-          'Do not replace Platform.isLinux with Platform.isAndroid: an Android APK and Ubuntu PRoot are separate sandboxes.',
+          'This DroidForge build supports Android local execution only.',
         );
       case ExecutionMode.automatic:
         throw UnsupportedError('No compatible execution mode is available.');

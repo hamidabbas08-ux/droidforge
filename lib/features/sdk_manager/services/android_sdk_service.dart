@@ -64,9 +64,9 @@ class AndroidSdkService {
     void Function(double progress, String status)? onProgress,
     void Function(String line)? onOutput,
   }) async {
-    if (!Platform.isLinux) {
+    if (!Platform.isAndroid) {
       throw UnsupportedError(
-        'Android SDK installation currently requires DroidForge to run in Linux/Ubuntu.',
+        'Android SDK installation requires Android in this build.',
       );
     }
 
@@ -209,8 +209,8 @@ class AndroidSdkService {
   }
 
   static Future<void> _makeExecutable(String path) async {
-    if (!Platform.isLinux || !await File(path).exists()) return;
-    final result = await Process.run('chmod', ['+x', path]);
+    if (!Platform.isAndroid || !await File(path).exists()) return;
+    final result = await Process.run('/system/bin/chmod', ['+x', path]);
     if (result.exitCode != 0) {
       throw Exception('Could not make $path executable: ${result.stderr}');
     }

@@ -29,7 +29,7 @@ class GradleBuildService {
       throw Exception('Install the required packages in Android SDK Manager first.');
     }
 
-    if (!Platform.isLinux) {
+    if (!Platform.isAndroid) {
       throw UnsupportedError(
         'Gradle process execution requires DroidForge to run in Linux/Ubuntu.',
       );

@@ -33,7 +33,7 @@ class ProjectsScreen extends StatelessWidget {
             child: ListTile(
               leading: const Icon(Icons.terminal),
               title: const Text("Execution Environment"),
-              subtitle: const Text("Android, Linux, Termux or Ubuntu PRoot"),
+              subtitle: const Text("Android only"),
               trailing: const Icon(Icons.chevron_right),
               onTap: () {
                 Navigator.push(
