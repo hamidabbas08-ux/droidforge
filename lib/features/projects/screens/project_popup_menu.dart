@@ -16,10 +16,7 @@ class ProjectPopupMenu extends StatelessWidget {
     return PopupMenuButton<String>(
       onSelected: (value) async {
         if (value == "file") {
-          final name = await CreateDialog.show(
-            context,
-            "New File",
-          );
+          final name = await CreateDialog.show(context, "New File");
 
           if (name != null && name.isNotEmpty) {
             await onCreateFile(name);
@@ -27,10 +24,7 @@ class ProjectPopupMenu extends StatelessWidget {
         }
 
         if (value == "folder") {
-          final name = await CreateDialog.show(
-            context,
-            "New Folder",
-          );
+          final name = await CreateDialog.show(context, "New Folder");
 
           if (name != null && name.isNotEmpty) {
             await onCreateFolder(name);
@@ -38,14 +32,8 @@ class ProjectPopupMenu extends StatelessWidget {
         }
       },
       itemBuilder: (_) => const [
-        PopupMenuItem(
-          value: "file",
-          child: Text("New File"),
-        ),
-        PopupMenuItem(
-          value: "folder",
-          child: Text("New Folder"),
-        ),
+        PopupMenuItem(value: "file", child: Text("New File")),
+        PopupMenuItem(value: "folder", child: Text("New Folder")),
       ],
     );
   }

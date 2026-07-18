@@ -60,11 +60,9 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
 
                   if (!context.mounted) return;
 
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(e.toString()),
-                    ),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(e.toString())));
                 }
               },
               child: const Text("Create Project"),

@@ -6,13 +6,10 @@ import '../models/file_tree_node.dart';
 import '../templates/android_templates.dart';
 
 class ProjectService {
-
   static Future<Directory> _projectsRoot() async {
     final dir = await getApplicationDocumentsDirectory();
 
-    final root = Directory(
-      '${dir.path}/DroidForgeProjects',
-    );
+    final root = Directory('${dir.path}/DroidForgeProjects');
 
     if (!await root.exists()) {
       await root.create(recursive: true);
@@ -21,26 +18,17 @@ class ProjectService {
     return root;
   }
 
-  static Future<Directory> getProjectDirectory(
-    String projectName,
-  ) async {
+  static Future<Directory> getProjectDirectory(String projectName) async {
     final root = await _projectsRoot();
 
-    return Directory(
-      '${root.path}/$projectName',
-    );
+    return Directory('${root.path}/$projectName');
   }
 
-  static Future<FileTreeNode> loadProjectTree(
-    String projectName,
-  ) async {
-    final project =
-        await getProjectDirectory(projectName);
+  static Future<FileTreeNode> loadProjectTree(String projectName) async {
+    final project = await getProjectDirectory(projectName);
 
     if (!await project.exists()) {
-      throw Exception(
-        'Project not found',
-      );
+      throw Exception('Project not found');
     }
 
     return FileTreeNode.fromDirectory(project);
@@ -50,16 +38,11 @@ class ProjectService {
     required String projectName,
     required String packageName,
   }) async {
+    final project = await getProjectDirectory(projectName);
 
-    final project =
-        await getProjectDirectory(projectName);
+    await project.create(recursive: true);
 
-    await project.create(
-      recursive: true,
-    );
-
-    final javaPath =
-        packageName.replaceAll('.', '/');
+    final javaPath = packageName.replaceAll('.', '/');
     await Directory(
       "${project.path}/app/src/main/java/$javaPath",
     ).create(recursive: true);
@@ -72,13 +55,9 @@ class ProjectService {
       "${project.path}/app/src/main/res/values",
     ).create(recursive: true);
 
-    await Directory(
-      "${project.path}/gradle",
-    ).create(recursive: true);
+    await Directory("${project.path}/gradle").create(recursive: true);
 
-    await Directory(
-      "${project.path}/gradle/wrapper",
-    ).create(recursive: true);
+    await Directory("${project.path}/gradle/wrapper").create(recursive: true);
 
     final manifest = AndroidTemplates.manifest(
       packageName: packageName,
@@ -86,13 +65,11 @@ class ProjectService {
     );
 
     if (manifest.trim().isEmpty) {
-    print("PROJECT PATH: ${project.path}");
-    print("MANIFEST LENGTH: ${manifest.length}");
-    print(manifest.substring(0, manifest.length > 80 ? 80 : manifest.length));
+      print("PROJECT PATH: ${project.path}");
+      print("MANIFEST LENGTH: ${manifest.length}");
+      print(manifest.substring(0, manifest.length > 80 ? 80 : manifest.length));
 
-      throw Exception(
-        "AndroidManifest template is empty",
-      );
+      throw Exception("AndroidManifest template is empty");
     }
 
     await File(
@@ -101,82 +78,49 @@ class ProjectService {
 
     await File(
       "${project.path}/app/src/main/java/$javaPath/MainActivity.kt",
-    ).writeAsString(
-      AndroidTemplates.mainActivity(
-        packageName: packageName,
-      ),
-    );
+    ).writeAsString(AndroidTemplates.mainActivity(packageName: packageName));
 
     await File(
       "${project.path}/app/src/main/res/layout/activity_main.xml",
-    ).writeAsString(
-      AndroidTemplates.activityMain(),
-    );
+    ).writeAsString(AndroidTemplates.activityMain());
     await File(
       "${project.path}/build.gradle.kts",
-    ).writeAsString(
-      AndroidTemplates.rootBuildGradle(),
-    );
+    ).writeAsString(AndroidTemplates.rootBuildGradle());
 
     await File(
       "${project.path}/app/build.gradle.kts",
-    ).writeAsString(
-      AndroidTemplates.appBuildGradle(
-        packageName: packageName,
-      ),
-    );
+    ).writeAsString(AndroidTemplates.appBuildGradle(packageName: packageName));
 
     await File(
       "${project.path}/settings.gradle.kts",
-    ).writeAsString(
-      AndroidTemplates.settingsGradle(
-        appName: projectName,
-      ),
-    );
+    ).writeAsString(AndroidTemplates.settingsGradle(appName: projectName));
 
     await File(
       "${project.path}/gradle.properties",
-    ).writeAsString(
-      AndroidTemplates.gradleProperties(),
-    );
+    ).writeAsString(AndroidTemplates.gradleProperties());
 
     await File(
       "${project.path}/gradle/libs.versions.toml",
-    ).writeAsString(
-      AndroidTemplates.libsVersionsToml(),
-    );
+    ).writeAsString(AndroidTemplates.libsVersionsToml());
 
     await File(
       "${project.path}/gradle/wrapper/gradle-wrapper.properties",
-    ).writeAsString(
-      AndroidTemplates.gradleWrapperProperties(),
-    );
+    ).writeAsString(AndroidTemplates.gradleWrapperProperties());
 
     await File(
       "${project.path}/app/src/main/res/values/colors.xml",
-    ).writeAsString(
-      AndroidTemplates.colorsXml(),
-    );
+    ).writeAsString(AndroidTemplates.colorsXml());
 
     await File(
       "${project.path}/app/src/main/res/values/strings.xml",
-    ).writeAsString(
-      AndroidTemplates.stringsXml(
-        appName: projectName,
-      ),
-    );
+    ).writeAsString(AndroidTemplates.stringsXml(appName: projectName));
 
     await File(
       "${project.path}/app/src/main/res/values/themes.xml",
-    ).writeAsString(
-      AndroidTemplates.themesXml(),
-    );
-
+    ).writeAsString(AndroidTemplates.themesXml());
   }
-  static Future<void> createFolder(
-    String parent,
-    String name,
-  ) async {
+
+  static Future<void> createFolder(String parent, String name) async {
     final dir = Directory("$parent/$name");
 
     if (!await dir.exists()) {
@@ -184,10 +128,7 @@ class ProjectService {
     }
   }
 
-  static Future<void> createFile(
-    String parent,
-    String name,
-  ) async {
+  static Future<void> createFile(String parent, String name) async {
     final file = File("$parent/$name");
 
     if (!await file.exists()) {
@@ -195,14 +136,10 @@ class ProjectService {
     }
   }
 
-  static Future<void> rename(
-    String path,
-    String newName,
-  ) async {
+  static Future<void> rename(String path, String newName) async {
     final type = FileSystemEntity.typeSync(path);
 
-    final newPath =
-        "${File(path).parent.path}/$newName";
+    final newPath = "${File(path).parent.path}/$newName";
 
     switch (type) {
       case FileSystemEntityType.file:
@@ -214,14 +151,11 @@ class ProjectService {
         break;
 
       default:
-        throw Exception(
-          "Unsupported file system entity",
-        );
+        throw Exception("Unsupported file system entity");
     }
   }
-  static Future<void> delete(
-    String path,
-  ) async {
+
+  static Future<void> delete(String path) async {
     final type = FileSystemEntity.typeSync(path);
 
     switch (type) {
@@ -240,30 +174,21 @@ class ProjectService {
         break;
 
       default:
-        throw Exception(
-          "Unsupported file system entity",
-        );
+        throw Exception("Unsupported file system entity");
     }
   }
 
-  static Future<String> readFile(
-    String path,
-  ) async {
+  static Future<String> readFile(String path) async {
     final file = File(path);
 
     if (!await file.exists()) {
-      throw Exception(
-        "File not found",
-      );
+      throw Exception("File not found");
     }
 
     return await file.readAsString();
   }
 
-  static Future<void> saveFile(
-    String path,
-    String content,
-  ) async {
+  static Future<void> saveFile(String path, String content) async {
     final file = File(path);
 
     await file.writeAsString(content);

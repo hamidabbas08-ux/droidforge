@@ -55,8 +55,7 @@ class FileTreeNode {
     return FileTreeNode(
       name: directory.uri.pathSegments.isEmpty
           ? directory.path
-          : directory.uri.pathSegments[
-              directory.uri.pathSegments.length - 2],
+          : directory.uri.pathSegments[directory.uri.pathSegments.length - 2],
       path: directory.path,
       isDirectory: true,
       children: children,

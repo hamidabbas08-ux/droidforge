@@ -9,9 +9,7 @@ void main() {
   print("Manifest length: ${manifest.length}");
   print(manifest);
 
-  final activity = AndroidTemplates.mainActivity(
-    packageName: "com.test.app",
-  );
+  final activity = AndroidTemplates.mainActivity(packageName: "com.test.app");
 
   print("MainActivity length: ${activity.length}");
   print(activity);

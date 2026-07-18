@@ -5,21 +5,14 @@ import 'package:flutter/material.dart';
 class CodeEditorScreen extends StatefulWidget {
   final String fileName;
 
-  const CodeEditorScreen({
-    super.key,
-    required this.fileName,
-  });
+  const CodeEditorScreen({super.key, required this.fileName});
 
   @override
-  State<CodeEditorScreen> createState() =>
-      _CodeEditorScreenState();
+  State<CodeEditorScreen> createState() => _CodeEditorScreenState();
 }
 
-class _CodeEditorScreenState
-    extends State<CodeEditorScreen> {
-
-  final TextEditingController controller =
-      TextEditingController();
+class _CodeEditorScreenState extends State<CodeEditorScreen> {
+  final TextEditingController controller = TextEditingController();
 
   bool loading = true;
 
@@ -34,8 +27,7 @@ class _CodeEditorScreenState
       final file = File(widget.fileName);
 
       if (await file.exists()) {
-        controller.text =
-            await file.readAsString();
+        controller.text = await file.readAsString();
       } else {
         controller.text = "";
       }
@@ -64,38 +56,28 @@ class _CodeEditorScreenState
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            "${widget.fileName} saved successfully",
-          ),
-        ),
+        SnackBar(content: Text("${widget.fileName} saved successfully")),
       );
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Error saving file:\n$e"),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error saving file:\n$e")));
     }
   }
 
   @override
-  Widget build(BuildContext context) {    return Scaffold(
+  Widget build(BuildContext context) {
+    return Scaffold(
       appBar: AppBar(
         title: Text(widget.fileName.split('/').last),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _saveFile,
-          ),
+          IconButton(icon: const Icon(Icons.save), onPressed: _saveFile),
         ],
       ),
       body: loading
-          ? const Center(
-              child: CircularProgressIndicator(),
-            )
+          ? const Center(child: CircularProgressIndicator())
           : Padding(
               padding: const EdgeInsets.all(16),
               child: TextField(
@@ -104,18 +86,15 @@ class _CodeEditorScreenState
                 maxLines: null,
                 keyboardType: TextInputType.multiline,
                 textAlignVertical: TextAlignVertical.top,
-                decoration: const InputDecoration(
-                  border: InputBorder.none,
-                ),
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 14,
-                ),
+                decoration: const InputDecoration(border: InputBorder.none),
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
                 cursorColor: Colors.blue,
               ),
             ),
     );
-  }  @override
+  }
+
+  @override
   void dispose() {
     controller.dispose();
     super.dispose();

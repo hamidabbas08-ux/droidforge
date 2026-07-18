@@ -13,10 +13,7 @@ class DroidForgeApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'DroidForge',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorSchemeSeed: Colors.blue,
-      ),
+      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
       home: const ProjectsScreen(),
     );
   }

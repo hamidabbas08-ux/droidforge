@@ -14,14 +14,8 @@ class FileActions extends StatelessWidget {
   Widget build(BuildContext context) {
     return PopupMenuButton<int>(
       itemBuilder: (context) => const [
-        PopupMenuItem(
-          value: 1,
-          child: Text("New File"),
-        ),
-        PopupMenuItem(
-          value: 2,
-          child: Text("New Folder"),
-        ),
+        PopupMenuItem(value: 1, child: Text("New File")),
+        PopupMenuItem(value: 2, child: Text("New Folder")),
       ],
       onSelected: (value) {
         if (value == 1) {

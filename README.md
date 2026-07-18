@@ -15,3 +15,16 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+
+## JDK Manager / Gradle integration
+
+DroidForge now manages JDK 17, 21, and 24 under its application-support directory.
+The selected JDK is persisted and is passed as `JAVA_HOME`, `GRADLE_JAVA_HOME`, and
+the first entry in `PATH` when a Gradle debug build is launched.
+
+JDK downloads use the Eclipse Temurin/Adoptium binary API. The JDK manager is designed
+for the Linux/Ubuntu runtime where DroidForge can launch the Gradle process. On Android
+runtime, a Flutter app cannot generally launch arbitrary Ubuntu/Termux processes from
+its Android sandbox; the Linux/Ubuntu target is therefore the execution target for the
+integrated Gradle build path.

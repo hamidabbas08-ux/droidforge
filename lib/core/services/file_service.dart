@@ -30,10 +30,7 @@ class FileService {
     }
   }
 
-  static Future<void> saveFile(
-    String relativePath,
-    String content,
-  ) async {
+  static Future<void> saveFile(String relativePath, String content) async {
     final projectDir = await _projectDir();
     final file = File('${projectDir.path}/$relativePath');
 

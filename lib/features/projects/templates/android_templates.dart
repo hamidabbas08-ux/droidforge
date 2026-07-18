@@ -1,5 +1,4 @@
 class AndroidTemplates {
-
   static String manifest({
     required String packageName,
     required String appName,
@@ -32,9 +31,7 @@ class AndroidTemplates {
 ''';
   }
 
-  static String mainActivity({
-    required String packageName,
-  }) {
+  static String mainActivity({required String packageName}) {
     return '''
 package $packageName
 
@@ -71,6 +68,7 @@ class MainActivity : AppCompatActivity() {
 </LinearLayout>
 ''';
   }
+
   static String rootBuildGradle() {
     return '''
 plugins {
@@ -80,9 +78,7 @@ plugins {
 ''';
   }
 
-  static String appBuildGradle({
-    required String packageName,
-  }) {
+  static String appBuildGradle({required String packageName}) {
     return '''
 plugins {
     id("com.android.application")
@@ -125,14 +121,13 @@ dependencies {
 ''';
   }
 
-  static String settingsGradle({
-    required String appName,
-  }) {
+  static String settingsGradle({required String appName}) {
     return '''
 rootProject.name = "$appName"
 include(":app")
 ''';
   }
+
   static String gradleProperties() {
     return '''
 org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
@@ -171,6 +166,7 @@ zipStorePath=wrapper/dists
 distributionUrl=https\\://services.gradle.org/distributions/gradle-8.10-bin.zip
 ''';
   }
+
   static String colorsXml() {
     return '''
 <?xml version="1.0" encoding="utf-8"?>
@@ -184,9 +180,7 @@ distributionUrl=https\\://services.gradle.org/distributions/gradle-8.10-bin.zip
 ''';
   }
 
-  static String stringsXml({
-    required String appName,
-  }) {
+  static String stringsXml({required String appName}) {
     return '''
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
@@ -212,6 +206,7 @@ distributionUrl=https\\://services.gradle.org/distributions/gradle-8.10-bin.zip
 </resources>
 ''';
   }
+
   static String gitignore() {
     return '''
 *.iml
