@@ -23,7 +23,7 @@ class GradleBuildService {
       throw Exception('Please install and select a JDK in JDK Manager first.');
     }
 
-    if (!Platform.isLinux) {
+    if (!Platform.isAndriod) {
       throw UnsupportedError(
         'Gradle process execution requires DroidForge to run in the Linux/Ubuntu environment.',
       );
