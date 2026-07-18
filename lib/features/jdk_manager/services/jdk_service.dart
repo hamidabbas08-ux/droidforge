@@ -76,7 +76,7 @@ class JdkService {
       return;
     }
 
-    if (!Platform.isAndroid) {
+    if (!Platform.isLinux) {
       throw UnsupportedError(
         'DroidForge JDK installation currently requires the Linux/Ubuntu runtime.',
       );
@@ -138,6 +138,10 @@ class JdkService {
     final installedHome = await _findJavaHome(target);
     if (installedHome == null) {
       throw Exception('JDK extraction completed, but java executable was not found.');
+    }
+
+    if (Platform.isLinux) {
+      await Process.run('chmod', ['-R', 'u+rx', '${installedHome.path}/bin']);
     }
 
     await select(version);

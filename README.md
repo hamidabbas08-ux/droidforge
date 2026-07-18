@@ -28,3 +28,20 @@ for the Linux/Ubuntu runtime where DroidForge can launch the Gradle process. On 
 runtime, a Flutter app cannot generally launch arbitrary Ubuntu/Termux processes from
 its Android sandbox; the Linux/Ubuntu target is therefore the execution target for the
 integrated Gradle build path.
+
+## Integrated Android SDK Manager
+
+DroidForge now includes an Android SDK Manager that installs:
+
+- Android command-line tools
+- Platform Tools
+- Android Platform API 35
+- Build Tools 35.0.0
+
+Gradle builds use the selected JDK and the managed SDK through `JAVA_HOME`,
+`ANDROID_HOME`, `PATH`, and the project's `local.properties` (`sdk.dir`).
+
+The Linux packages published by Google may contain x86-64 native binaries.
+On an ARM64 phone/PRoot environment, `sdkmanager` can work through Java while
+native tools such as `adb`, `aapt2`, or `zipalign` can require an ARM64 build or
+an x86-64 translation layer.

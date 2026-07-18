@@ -1,7 +1,8 @@
-
+import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
-import 'dart:convert';
+
+import '../../sdk_manager/services/android_sdk_service.dart';
 import 'jdk_service.dart';
 
 class GradleBuildResult {
@@ -20,27 +21,54 @@ class GradleBuildService {
   }) async {
     final javaHome = await JdkService.activeJavaHome();
     if (javaHome == null) {
-      throw Exception('Please install and select a JDK in JDK Manager first.');
+      throw Exception('Install and select a JDK in JDK Manager first.');
     }
 
-    if (!Platform.isAndroid) {
+    final sdkStatus = await AndroidSdkService.status();
+    if (!sdkStatus.ready) {
+      throw Exception('Install the required packages in Android SDK Manager first.');
+    }
+
+    if (!Platform.isLinux) {
       throw UnsupportedError(
-        'Gradle process execution requires DroidForge to run in the Linux/Ubuntu environment.',
+        'Gradle process execution requires DroidForge to run in Linux/Ubuntu.',
       );
     }
 
-    final gradlew = File('$projectPath/gradlew');
-    final command = await gradlew.exists() ? './gradlew' : 'gradle';
+    await AndroidSdkService.writeLocalProperties(projectPath);
 
+    final rootGradlew = File('$projectPath/gradlew');
+    final androidGradlew = File('$projectPath/android/gradlew');
+    late final String workingDirectory;
+    late final String command;
+
+    if (await rootGradlew.exists()) {
+      workingDirectory = projectPath;
+      command = './gradlew';
+      await Process.run('chmod', ['+x', rootGradlew.path]);
+    } else if (await androidGradlew.exists()) {
+      workingDirectory = '$projectPath/android';
+      command = './gradlew';
+      await Process.run('chmod', ['+x', androidGradlew.path]);
+    } else {
+      workingDirectory = projectPath;
+      command = 'gradle';
+    }
+
+    final sdkPath = sdkStatus.sdkPath;
     final process = await Process.start(
       'bash',
       ['-lc', '$command assembleDebug'],
-      workingDirectory: projectPath,
+      workingDirectory: workingDirectory,
       environment: {
         ...Platform.environment,
         'JAVA_HOME': javaHome,
-        'PATH': '$javaHome/bin:${Platform.environment['PATH'] ?? ''}',
         'GRADLE_JAVA_HOME': javaHome,
+        'ANDROID_HOME': sdkPath,
+        // Kept for compatibility with tools that still read the old name.
+        'ANDROID_SDK_ROOT': sdkPath,
+        'PATH': '$javaHome/bin:$sdkPath/cmdline-tools/latest/bin:'
+            '$sdkPath/platform-tools:${Platform.environment['PATH'] ?? ''}',
       },
       runInShell: false,
     );
@@ -48,7 +76,9 @@ class GradleBuildService {
     final output = StringBuffer();
 
     Future<void> consume(Stream<List<int>> stream) async {
-      await for (final chunk in stream.transform(SystemEncoding().decoder).transform(const LineSplitter())) {
+      await for (final chunk in stream
+          .transform(SystemEncoding().decoder)
+          .transform(const LineSplitter())) {
         output.writeln(chunk);
         onOutput?.call(chunk);
       }
