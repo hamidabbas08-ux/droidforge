@@ -1,5 +1,6 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import '../../../core/services/file_service.dart';
 
 class CodeEditorScreen extends StatefulWidget {
   final String fileName;
@@ -10,11 +11,15 @@ class CodeEditorScreen extends StatefulWidget {
   });
 
   @override
-  State<CodeEditorScreen> createState() => _CodeEditorScreenState();
+  State<CodeEditorScreen> createState() =>
+      _CodeEditorScreenState();
 }
 
-class _CodeEditorScreenState extends State<CodeEditorScreen> {
-  final TextEditingController controller = TextEditingController();
+class _CodeEditorScreenState
+    extends State<CodeEditorScreen> {
+
+  final TextEditingController controller =
+      TextEditingController();
 
   bool loading = true;
 
@@ -25,34 +30,61 @@ class _CodeEditorScreenState extends State<CodeEditorScreen> {
   }
 
   Future<void> _loadFile() async {
-    final text = await FileService.readFile(widget.fileName);
+    try {
+      final file = File(widget.fileName);
 
-    if (!mounted) return;
+      if (await file.exists()) {
+        controller.text =
+            await file.readAsString();
+      } else {
+        controller.text = "";
+      }
+      if (!mounted) return;
 
-    setState(() {
-      controller.text = text;
-      loading = false;
-    });
+      setState(() {
+        loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        controller.text = "// Error reading file\n$e";
+        loading = false;
+      });
+    }
   }
 
   Future<void> _saveFile() async {
-    await FileService.saveFile(
-      widget.fileName,
-      controller.text,
-    );    if (!mounted) return;
+    try {
+      final file = File(widget.fileName);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("${widget.fileName} saved successfully"),
-      ),
-    );
+      await file.parent.create(recursive: true);
+      await file.writeAsString(controller.text);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "${widget.fileName} saved successfully",
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error saving file:\n$e"),
+        ),
+      );
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+  Widget build(BuildContext context) {    return Scaffold(
       appBar: AppBar(
-        title: Text(widget.fileName),
+        title: Text(widget.fileName.split('/').last),
         actions: [
           IconButton(
             icon: const Icon(Icons.save),
@@ -70,19 +102,20 @@ class _CodeEditorScreenState extends State<CodeEditorScreen> {
                 controller: controller,
                 expands: true,
                 maxLines: null,
+                keyboardType: TextInputType.multiline,
+                textAlignVertical: TextAlignVertical.top,
                 decoration: const InputDecoration(
                   border: InputBorder.none,
                 ),
                 style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 14,
-                ),                cursorColor: Colors.blue,
+                ),
+                cursorColor: Colors.blue,
               ),
             ),
     );
-  }
-
-  @override
+  }  @override
   void dispose() {
     controller.dispose();
     super.dispose();
