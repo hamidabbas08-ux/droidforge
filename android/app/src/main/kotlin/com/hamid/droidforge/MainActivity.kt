@@ -460,7 +460,7 @@ class MainActivity : FlutterActivity() {
             val home = layout["home"] ?: filesDir.absolutePath
             val tmp = layout["tmp"] ?: cacheDir.absolutePath
             val marker = "DROIDFORGE_FOUNDATION_OK"
-            val script = "printf 'stdout-ok\n'; printf 'stderr-ok\n' >&2; printf '%s\n' "\$PWD"; printf '%s\n' "\$DROIDFORGE_MARKER""
+                val script = """printf 'stdout-ok\n'; printf 'stderr-ok\n' >&2; printf '%s\n' "\$PWD"; printf '%s\n' "\$DROIDFORGE_MARKER""""
             val startedAt = System.nanoTime()
             val process = runProcess(
                 "/system/bin/sh",
