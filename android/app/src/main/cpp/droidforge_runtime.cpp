@@ -232,7 +232,7 @@ static jobject startEmbeddedJvmImpl(
             options[i].extraInfo = nullptr;
           }
           JavaVMInitArgs args{};
-          args.version = JNI_VERSION_1_8;
+          args.version = JNI_VERSION_1_6;
           args.nOptions = static_cast<jint>(options.size());
           args.options = options.data();
           args.ignoreUnrecognized = JNI_FALSE;
