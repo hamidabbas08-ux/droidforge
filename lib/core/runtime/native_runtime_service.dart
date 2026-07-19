@@ -127,6 +127,22 @@ class NativeRuntimeService {
     await _channel.invokeMethod<void>('chmodExecutable', {'path': path});
   }
 
+  static Future<NativeProcessResult> launchJava({
+    required String javaHome,
+  }) async {
+    final raw = await _channel.invokeMapMethod<String, dynamic>('launchJava', {
+      'javaHome': javaHome,
+    });
+    if (raw == null) {
+      throw StateError('Native JLI launcher returned no result.');
+    }
+    return NativeProcessResult(
+      exitCode: raw['exitCode'] as int? ?? -1,
+      stdout: raw['stdout'] as String? ?? '',
+      stderr: raw['stderr'] as String? ?? '',
+    );
+  }
+
   static Future<NativeProcessResult> run({
     required String executable,
     List<String> arguments = const [],

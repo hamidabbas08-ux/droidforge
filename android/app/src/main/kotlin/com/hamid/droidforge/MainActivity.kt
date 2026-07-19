@@ -17,6 +17,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private external fun nativeHealthCheck(): String
+    private external fun nativeLaunchJava(javaHome: String, nativeLibraryDir: String): HashMap<String, Any>
     private val executor = Executors.newCachedThreadPool()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -51,6 +52,26 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         } catch (error: Throwable) {
                             result.error("CHMOD_FAILED", safeMessage(error), null)
+                        }
+                    }
+                }
+                "launchJava" -> {
+                    val javaHome = call.argument<String>("javaHome")
+                    if (javaHome.isNullOrBlank()) {
+                        result.error("BAD_ARGUMENT", "Missing JAVA_HOME", null)
+                        return@setMethodCallHandler
+                    }
+                    executor.execute {
+                        try {
+                            val processResult = nativeLaunchJava(
+                                javaHome,
+                                applicationInfo.nativeLibraryDir
+                            )
+                            runOnUiThread { result.success(processResult) }
+                        } catch (error: Throwable) {
+                            runOnUiThread {
+                                result.error("JAVA_LAUNCH_FAILED", safeMessage(error), error.javaClass.name)
+                            }
                         }
                     }
                 }

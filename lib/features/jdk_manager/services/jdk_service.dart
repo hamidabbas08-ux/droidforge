@@ -103,7 +103,7 @@ class JdkService {
     onProgress?.call(0.93, 'Verifying Java runtime...');
     if (!await _verifyJava(home)) {
       throw Exception(
-        'Android JDK 17 was downloaded but could not execute. '
+        'Android JDK 17 was extracted, but the APK-packaged JLI launcher could not start it. '
         'This device may block executables from app storage.',
       );
     }
@@ -117,18 +117,11 @@ class JdkService {
     try {
       final info = await NativeRuntimeService.runtimeInfo();
       if (!info.isArm64) return false;
-      await NativeRuntimeService.chmodExecutable(java.path);
-      final result = await NativeRuntimeService.run(
-        executable: java.path,
-        arguments: const ['-version'],
-        environment: {
-          'JAVA_HOME': javaHome.path,
-          'HOME': javaHome.parent.path,
-          'TMPDIR': Directory.systemTemp.path,
-          'LD_LIBRARY_PATH': '${javaHome.path}/lib:${javaHome.path}/lib/server',
-        },
+      final result = await NativeRuntimeService.launchJava(
+        javaHome: javaHome.path,
       );
-      return result.success;
+      return result.success &&
+          (result.stderr.contains('version') || result.stdout.contains('version'));
     } catch (_) {
       return false;
     }
