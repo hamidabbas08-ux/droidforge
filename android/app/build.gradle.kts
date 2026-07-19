@@ -9,8 +9,6 @@ android {
         jniLibs {
             useLegacyPackaging = true
         }
-        resources {
-                }
     }
 
     namespace = "com.hamid.droidforge"

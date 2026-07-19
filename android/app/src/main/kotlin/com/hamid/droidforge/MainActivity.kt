@@ -18,7 +18,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private external fun nativeHealthCheck(): String
-    private external fun nativeLaunchJava(javaHome: String, nativeLibraryDir: String): HashMap<String, Any>
+    private external fun nativeLaunchJava(javaHome: String, nativeLibraryDir: String, diagnosticPath: String): HashMap<String, Any>
     private val executor = Executors.newCachedThreadPool()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -87,7 +87,8 @@ class MainActivity : FlutterActivity() {
                         try {
                             val processResult = nativeLaunchJava(
                                 javaHome,
-                                applicationInfo.nativeLibraryDir
+                                applicationInfo.nativeLibraryDir,
+                                File(filesDir, RuntimeProbeService.DIAGNOSTIC_FILE).absolutePath
                             )
                             runOnUiThread { result.success(processResult) }
                         } catch (error: Throwable) {
@@ -130,7 +131,9 @@ class MainActivity : FlutterActivity() {
 
     private fun probeEmbeddedJvmSafely(javaHome: String): HashMap<String, Any> {
         val resultFile = File(filesDir, RuntimeProbeService.RESULT_FILE)
+        val diagnosticFile = File(filesDir, RuntimeProbeService.DIAGNOSTIC_FILE)
         resultFile.delete()
+        diagnosticFile.delete()
 
         val intent = android.content.Intent(this, RuntimeProbeService::class.java).apply {
             action = RuntimeProbeService.ACTION_PROBE
@@ -163,7 +166,13 @@ class MainActivity : FlutterActivity() {
                     hashMapOf(
                         "exitCode" to (lines.getOrNull(0)?.toIntOrNull() ?: -1),
                         "stdout" to decodeProbeValue(lines.getOrNull(1).orEmpty()),
-                        "stderr" to decodeProbeValue(lines.getOrNull(2).orEmpty()),
+                        "stderr" to buildString {
+                            append(decodeProbeValue(lines.getOrNull(2).orEmpty()))
+                            if (diagnosticFile.isFile) {
+                                append("\n\nJVM startup diagnostic:\n")
+                                append(diagnosticFile.readText())
+                            }
+                        },
                     )
                 } catch (error: Throwable) {
                     hashMapOf(
@@ -181,7 +190,15 @@ class MainActivity : FlutterActivity() {
         return hashMapOf(
             "exitCode" to 134,
             "stdout" to "",
-            "stderr" to "The isolated JVM process stopped or timed out. DroidForge remained open safely.",
+            "stderr" to buildString {
+                append("The isolated JVM process stopped or timed out. DroidForge remained open safely.")
+                if (diagnosticFile.isFile) {
+                    append("\n\nLast native startup stage:\n")
+                    append(diagnosticFile.readText())
+                } else {
+                    append("\nNo native diagnostic file was produced; the process may have failed before JNI entry.")
+                }
+            },
         )
     }
 
@@ -223,7 +240,7 @@ class MainActivity : FlutterActivity() {
     private fun prepareEmbeddedJdk(): String {
         val javaHome = File(filesDir, "DroidForge/runtime/jdk/jdk17-embedded")
         val marker = File(javaHome, ".foundation-ready")
-        val expectedFoundationVersion = "v11.9"
+        val expectedFoundationVersion = "v11.10"
         val installedFoundationVersion = marker.takeIf { it.isFile }?.readText()?.trim()
 
         if (installedFoundationVersion != expectedFoundationVersion || !embeddedJdkImageIsComplete(javaHome)) {

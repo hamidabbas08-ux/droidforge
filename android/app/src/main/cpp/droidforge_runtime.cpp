@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include <ctime>
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_com_hamid_droidforge_MainActivity_nativeHealthCheck(
@@ -67,7 +68,8 @@ Java_com_hamid_droidforge_MainActivity_nativeLaunchJava(
     JNIEnv* env,
     jobject /* thiz */,
     jstring javaHomeValue,
-    jstring nativeLibraryDirValue) {
+    jstring nativeLibraryDirValue,
+    jstring /* diagnosticPathValue */) {
   const char* javaHomeChars = env->GetStringUTFChars(javaHomeValue, nullptr);
   const char* nativeLibraryDirChars = env->GetStringUTFChars(nativeLibraryDirValue, nullptr);
   const std::string javaHome(javaHomeChars ? javaHomeChars : "");
@@ -157,6 +159,32 @@ Java_com_hamid_droidforge_MainActivity_nativeLaunchJava(
 using CreateJavaVm = jint (*)(JavaVM**, void**, void*);
 static JavaVM* g_embedded_vm = nullptr;
 
+static void appendDiagnostic(const std::string& path, const std::string& stage) {
+  if (path.empty()) return;
+  const int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0600);
+  if (fd < 0) return;
+  timespec ts{};
+  clock_gettime(CLOCK_REALTIME, &ts);
+  const std::string line = std::to_string(ts.tv_sec) + "." +
+      std::to_string(ts.tv_nsec / 1000000) + "|pid=" +
+      std::to_string(getpid()) + "|" + stage + "\n";
+  const char* data = line.data();
+  size_t remaining = line.size();
+  while (remaining > 0) {
+    const ssize_t written = write(fd, data, remaining);
+    if (written > 0) {
+      data += written;
+      remaining -= static_cast<size_t>(written);
+    } else if (written < 0 && errno == EINTR) {
+      continue;
+    } else {
+      break;
+    }
+  }
+  fsync(fd);
+  close(fd);
+}
+
 static std::string jstringToUtf8(JNIEnv* env, jstring value) {
   if (value == nullptr) return "";
   const char* chars = env->GetStringUTFChars(value, nullptr);
@@ -188,15 +216,21 @@ static std::string describeAndClearJavaException(JNIEnv* env) {
 static jobject startEmbeddedJvmImpl(
     JNIEnv* artEnv,
     jstring javaHomeValue,
-    jstring nativeLibraryDirValue) {
+    jstring nativeLibraryDirValue,
+    jstring diagnosticPathValue) {
   const std::string javaHome = jstringToUtf8(artEnv, javaHomeValue);
   const std::string nativeLibraryDir = jstringToUtf8(artEnv, nativeLibraryDirValue);
+  const std::string diagnosticPath = jstringToUtf8(artEnv, diagnosticPathValue);
+  appendDiagnostic(diagnosticPath, "01-native-entry");
+  appendDiagnostic(diagnosticPath, "02-java-home=" + javaHome);
+  appendDiagnostic(diagnosticPath, "03-native-lib-dir=" + nativeLibraryDir);
 
   int exitCode = 1;
   std::string stdoutText;
   std::string stderrText;
 
   if (javaHome.empty() || nativeLibraryDir.empty()) {
+    appendDiagnostic(diagnosticPath, "04-invalid-empty-path");
     stderrText = "JAVA_HOME or nativeLibraryDir is empty";
   } else {
     JNIEnv* jvmEnv = nullptr;
@@ -214,28 +248,47 @@ static jobject startEmbeddedJvmImpl(
       setenv("HOME", javaHome.c_str(), 1);
       setenv("TMPDIR", tmpDir.c_str(), 1);
       setenv("LD_LIBRARY_PATH", libraryPath.c_str(), 1);
-      chdir(javaHome.c_str());
+      appendDiagnostic(diagnosticPath, "04-environment-configured");
+      if (chdir(javaHome.c_str()) != 0) {
+        appendDiagnostic(diagnosticPath, "05-chdir-failed errno=" + std::to_string(errno));
+      } else {
+        appendDiagnostic(diagnosticPath, "05-chdir-success");
+      }
 
       const std::vector<std::string> preloadNames = {
           "libjimage.so", "libjava.so", "libverify.so", "libzip.so"};
       for (const auto& name : preloadNames) {
         const std::string path = runtimeLibDir + "/" + name;
+        appendDiagnostic(diagnosticPath, "06-preload-start " + name);
         void* preload = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);
         if (preload == nullptr) {
-          stderrText = "preload " + name + " failed: " + std::string(dlerror());
+          const char* error = dlerror();
+          stderrText = "preload " + name + " failed: " + std::string(error ? error : "unknown");
+          appendDiagnostic(diagnosticPath, "07-preload-failed " + name + "|" + stderrText);
           break;
         }
+        appendDiagnostic(diagnosticPath, "07-preload-success " + name);
       }
 
       const std::string jvmPath = serverLibDir + "/libjvm.so";
+      appendDiagnostic(diagnosticPath, "08-dlopen-libjvm-start " + jvmPath);
       void* handle = stderrText.empty() ? dlopen(jvmPath.c_str(), RTLD_NOW | RTLD_GLOBAL) : nullptr;
       if (handle == nullptr) {
-        if (stderrText.empty()) stderrText = std::string("dlopen libjvm failed: ") + dlerror();
+        if (stderrText.empty()) {
+          const char* error = dlerror();
+          stderrText = std::string("dlopen libjvm failed: ") + (error ? error : "unknown");
+        }
+        appendDiagnostic(diagnosticPath, "09-dlopen-libjvm-failed|" + stderrText);
       } else {
+        appendDiagnostic(diagnosticPath, "09-dlopen-libjvm-success");
+        dlerror();
         auto createVm = reinterpret_cast<CreateJavaVm>(dlsym(handle, "JNI_CreateJavaVM"));
         if (createVm == nullptr) {
-          stderrText = std::string("JNI_CreateJavaVM not found: ") + dlerror();
+          const char* error = dlerror();
+          stderrText = std::string("JNI_CreateJavaVM not found: ") + (error ? error : "unknown");
+          appendDiagnostic(diagnosticPath, "10-dlsym-failed|" + stderrText);
         } else {
+          appendDiagnostic(diagnosticPath, "10-dlsym-success");
           std::vector<std::string> optionStorage = {
               "-Djava.home=" + javaHome,
               "-Dsun.boot.library.path=" + runtimeLibDir,
@@ -261,7 +314,9 @@ static jobject startEmbeddedJvmImpl(
           args.nOptions = static_cast<jint>(options.size());
           args.options = options.data();
           args.ignoreUnrecognized = JNI_FALSE;
+          appendDiagnostic(diagnosticPath, "11-JNI_CreateJavaVM-call options=" + std::to_string(options.size()));
           const jint created = createVm(&g_embedded_vm, reinterpret_cast<void**>(&jvmEnv), &args);
+          appendDiagnostic(diagnosticPath, "12-JNI_CreateJavaVM-return code=" + std::to_string(created));
           if (created != JNI_OK || g_embedded_vm == nullptr || jvmEnv == nullptr) {
             stderrText = "JNI_CreateJavaVM failed with code " + std::to_string(created);
             g_embedded_vm = nullptr;
@@ -271,26 +326,32 @@ static jobject startEmbeddedJvmImpl(
     }
 
     if (jvmEnv != nullptr && stderrText.empty()) {
+      appendDiagnostic(diagnosticPath, "13-find-System-start");
       jclass systemClass = jvmEnv->FindClass("java/lang/System");
       if (systemClass == nullptr) {
         stderrText = describeAndClearJavaException(jvmEnv);
+        appendDiagnostic(diagnosticPath, "14-find-System-failed|" + stderrText);
         if (stderrText.empty()) stderrText = "java/lang/System was not found";
       } else {
+        appendDiagnostic(diagnosticPath, "14-find-System-success");
         jmethodID getProperty = jvmEnv->GetStaticMethodID(
             systemClass,
             "getProperty",
             "(Ljava/lang/String;)Ljava/lang/String;");
         if (getProperty == nullptr) {
           stderrText = describeAndClearJavaException(jvmEnv);
+        appendDiagnostic(diagnosticPath, "14-find-System-failed|" + stderrText);
           if (stderrText.empty()) stderrText = "System.getProperty was not found";
         } else {
           jstring key = jvmEnv->NewStringUTF("java.version");
           auto value = static_cast<jstring>(jvmEnv->CallStaticObjectMethod(systemClass, getProperty, key));
           if (jvmEnv->ExceptionCheck()) {
             stderrText = describeAndClearJavaException(jvmEnv);
+        appendDiagnostic(diagnosticPath, "14-find-System-failed|" + stderrText);
           } else {
             const std::string version = jstringToUtf8(jvmEnv, value);
             stdoutText = "embedded-jvm-ok|java.version=" + version;
+            appendDiagnostic(diagnosticPath, "15-java-version=" + version);
             exitCode = version.empty() ? 2 : 0;
           }
           if (key != nullptr) jvmEnv->DeleteLocalRef(key);
@@ -301,6 +362,7 @@ static jobject startEmbeddedJvmImpl(
     }
   }
 
+  appendDiagnostic(diagnosticPath, "99-native-return exitCode=" + std::to_string(exitCode) + "|stderr=" + stderrText);
   jclass mapClass = artEnv->FindClass("java/util/HashMap");
   jmethodID ctor = artEnv->GetMethodID(mapClass, "<init>", "()V");
   jmethodID put = artEnv->GetMethodID(
@@ -319,8 +381,9 @@ Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
     JNIEnv* env,
     jobject /* thiz */,
     jstring javaHomeValue,
-    jstring nativeLibraryDirValue) {
-  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue);
+    jstring nativeLibraryDirValue,
+    jstring diagnosticPathValue) {
+  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue, diagnosticPathValue);
 }
 
 extern "C" JNIEXPORT jobject JNICALL
@@ -328,6 +391,7 @@ Java_com_hamid_droidforge_RuntimeProbeService_nativeProbeEmbeddedJvm(
     JNIEnv* env,
     jobject /* thiz */,
     jstring javaHomeValue,
-    jstring nativeLibraryDirValue) {
-  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue);
+    jstring nativeLibraryDirValue,
+    jstring diagnosticPathValue) {
+  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue, diagnosticPathValue);
 }

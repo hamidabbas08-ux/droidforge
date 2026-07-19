@@ -2,14 +2,12 @@ name: Flutter Android Build
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository with Git LFS
         uses: actions/checkout@v4
@@ -17,12 +15,10 @@ jobs:
           lfs: true
           fetch-depth: 0
 
-      - name: Fetch Git LFS files
+      - name: Verify embedded JDK image
         run: |
-          git lfs install
           git lfs pull
           git lfs checkout
-          echo "Embedded JDK modules size:"
           wc -c android/app/src/main/assets/jdk17/lib/modules
           test "$(wc -c < android/app/src/main/assets/jdk17/lib/modules)" -eq 128712865
 

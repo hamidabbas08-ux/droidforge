@@ -16,6 +16,7 @@ class RuntimeProbeService : Service() {
         const val EXTRA_JAVA_HOME = "javaHome"
         const val EXTRA_NATIVE_LIBRARY_DIR = "nativeLibraryDir"
         const val RESULT_FILE = "runtime-probe-result.txt"
+        const val DIAGNOSTIC_FILE = "jvm_startup.log"
 
         init {
             System.loadLibrary("droidforge_runtime")
@@ -25,6 +26,7 @@ class RuntimeProbeService : Service() {
     private external fun nativeProbeEmbeddedJvm(
         javaHome: String,
         nativeLibraryDir: String,
+        diagnosticPath: String,
     ): HashMap<String, Any>
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -40,11 +42,13 @@ class RuntimeProbeService : Service() {
         val javaHome = intent.getStringExtra(EXTRA_JAVA_HOME).orEmpty()
         val nativeLibraryDir = intent.getStringExtra(EXTRA_NATIVE_LIBRARY_DIR).orEmpty()
         val resultFile = File(filesDir, RESULT_FILE)
+        val diagnosticFile = File(filesDir, DIAGNOSTIC_FILE)
         resultFile.delete()
+        diagnosticFile.delete()
 
         executor.execute {
             val text = try {
-                val result = nativeProbeEmbeddedJvm(javaHome, nativeLibraryDir)
+                val result = nativeProbeEmbeddedJvm(javaHome, nativeLibraryDir, diagnosticFile.absolutePath)
                 val exitCode = (result["exitCode"] as? Number)?.toInt() ?: -1
                 val stdout = result["stdout"]?.toString().orEmpty()
                 val stderr = result["stderr"]?.toString().orEmpty()
