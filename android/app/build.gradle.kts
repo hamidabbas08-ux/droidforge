@@ -10,7 +10,9 @@ android {
             useLegacyPackaging = true
         }
         resources {
-            noCompress += setOf("modules")
+            androidResources {
+        noCompress += "modules"
+    }
         }
     }
 
