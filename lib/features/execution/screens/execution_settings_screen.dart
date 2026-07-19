@@ -13,9 +13,18 @@ class ExecutionSettingsScreen extends StatelessWidget {
           Card(
             child: ListTile(
               leading: Icon(Icons.android),
-              title: Text('Android only'),
-              subtitle: Text('Local Android execution is permanently active.'),
+              title: Text('Android'),
+              subtitle: Text('Android local execution is permanently selected.'),
               trailing: Icon(Icons.check_circle),
+            ),
+          ),
+          SizedBox(height: 12),
+          Card(
+            child: Padding(
+              padding: EdgeInsets.all(16),
+              child: Text(
+                'This build is Android-only. Linux, Ubuntu, Termux and PRoot modes are disabled.',
+              ),
             ),
           ),
         ],

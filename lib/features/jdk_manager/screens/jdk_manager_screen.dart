@@ -42,6 +42,13 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
   Future<void> _tap(JdkVersion version) async {
     if (busyMajor != null) return;
 
+    if (!version.available) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${version.label} is Coming Soon.')),
+      );
+      return;
+    }
+
     if (installed.contains(version.major)) {
       await JdkService.select(version);
       if (mounted) setState(() => active = version);
@@ -88,7 +95,7 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Android-only runtime manager. JDK 17 is the first supported Gradle runtime.',
+            'Select the JDK DroidForge should use for Gradle builds.',
             style: TextStyle(fontSize: 15),
           ),
           const SizedBox(height: 16),
@@ -110,11 +117,13 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
                     : Text(
                         installed.contains(version.major)
                             ? (active?.major == version.major ? 'Active JDK for Gradle' : 'Installed')
-                            : 'Android runtime package required',
+                            : version.availabilityLabel,
                       ),
                 trailing: active?.major == version.major
                     ? const Icon(Icons.check_circle)
-                    : const Icon(Icons.chevron_right),
+                    : version.available
+                        ? const Icon(Icons.chevron_right)
+                        : const Chip(label: Text('Coming Soon')),
                 onTap: () => _tap(version),
               ),
             ),

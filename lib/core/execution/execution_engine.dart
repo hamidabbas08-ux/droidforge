@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'execution_mode.dart';
+import 'execution_settings.dart';
 
 class ExecutionResult {
   final int exitCode;
@@ -20,15 +21,25 @@ class ExecutionResult {
 
 class ExecutionEngine {
   static Future<ExecutionMode> resolvedMode() async {
+    final saved = await ExecutionSettings.load();
     if (!Platform.isAndroid) {
-      throw UnsupportedError('DroidForge runs on Android only.');
+      throw UnsupportedError('DroidForge is configured for Android only.');
     }
     return ExecutionMode.androidLocal;
   }
 
   static Future<String> supportMessage() async {
-    await resolvedMode();
-    return 'Android local execution is active.';
+    final mode = await resolvedMode();
+    return switch (mode) {
+      ExecutionMode.linuxDirect => 'Linux mode is disabled in this Android-only build.',
+      ExecutionMode.androidLocal =>
+        'Android local mode can run /system/bin/sh commands, but it cannot access Termux or Ubuntu files.',
+      ExecutionMode.termuxBridge =>
+        'Termux bridge is selected. The native bridge must be installed before commands can run.',
+      ExecutionMode.prootUbuntu =>
+        'Ubuntu PRoot mode is selected. It requires the Termux bridge and the Ubuntu distribution name/path.',
+      ExecutionMode.automatic => 'No compatible execution mode was detected.',
+    };
   }
 
   static Future<ExecutionResult> run({
@@ -38,15 +49,37 @@ class ExecutionEngine {
     Map<String, String>? environment,
     void Function(String line)? onOutput,
   }) async {
-    await resolvedMode();
-    final shellCommand = _shellJoin(command, arguments);
-    return _runProcess(
-      command: '/system/bin/sh',
-      arguments: ['-c', shellCommand],
-      workingDirectory: workingDirectory,
-      environment: environment,
-      onOutput: onOutput,
-    );
+    final mode = await resolvedMode();
+    switch (mode) {
+      case ExecutionMode.linuxDirect:
+        return _runProcess(
+          command: command,
+          arguments: arguments,
+          workingDirectory: workingDirectory,
+          environment: environment,
+          onOutput: onOutput,
+        );
+      case ExecutionMode.androidLocal:
+        if (!Platform.isAndroid) {
+          throw UnsupportedError('Android local mode requires Android.');
+        }
+        final shellCommand = _shellJoin(command, arguments);
+        return _runProcess(
+          command: '/system/bin/sh',
+          arguments: ['-c', shellCommand],
+          workingDirectory: workingDirectory,
+          environment: environment,
+          onOutput: onOutput,
+        );
+      case ExecutionMode.termuxBridge:
+      case ExecutionMode.prootUbuntu:
+        throw UnsupportedError(
+          'The Termux/Ubuntu bridge is selected but is not installed in this build yet. '
+          'This DroidForge build supports Android local execution only.',
+        );
+      case ExecutionMode.automatic:
+        throw UnsupportedError('No compatible execution mode is available.');
+    }
   }
 
   static Future<ExecutionResult> _runProcess({

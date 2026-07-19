@@ -94,8 +94,8 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
             child: Column(
               children: [
                 _packageTile(
-                  'Android SDK Runtime',
-                  'Android ARM64 SDK component',
+                  'Command-line Tools',
+                  'sdkmanager and Android command-line utilities',
                   value?.commandLineTools ?? false,
                 ),
                 const Divider(height: 1),
@@ -121,7 +121,7 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'V8 blocks incompatible desktop SDK packages. Installation will be enabled only after an Android ARM64 SDK component is bundled.',
+            'V9 accepts Android ARM64 packages only. Incompatible desktop/Linux SDK archives are blocked.',
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -153,7 +153,7 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
           ],
           const SizedBox(height: 12),
           const Text(
-            'Android-only status: desktop, server and non-Android execution paths have been removed. JDK and SDK installation remain disabled until verified Android ARM64 components are bundled.',
+            'JDK 17 must be verified first. JDK 21 and JDK 24 remain visible as Coming Soon.',
             style: TextStyle(fontSize: 12),
           ),
         ],

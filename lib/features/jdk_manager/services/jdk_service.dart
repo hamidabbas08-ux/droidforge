@@ -42,23 +42,21 @@ class JdkService {
     if (version == null) return null;
     final dir = await installDirectory(version);
     final home = await _findJavaHome(dir);
-    if (home == null) return null;
-    return await _isAndroidJavaExecutable(home) ? home.path : null;
+    if (home == null || !await _verifyJava(home)) return null;
+    return home.path;
   }
 
   static Future<bool> isInstalled(JdkVersion version) async {
     final dir = await installDirectory(version);
     final home = await _findJavaHome(dir);
-    if (home == null) return false;
-    return _isAndroidJavaExecutable(home);
+    return home != null && await _verifyJava(home);
   }
 
   static Future<void> select(JdkVersion version) async {
     if (!await isInstalled(version)) {
-      throw Exception('${version.label} Android runtime is not installed.');
+      throw Exception('${version.label} is not installed or cannot run on Android.');
     }
-    final file = await _activeFile();
-    await file.writeAsString(jsonEncode({'major': version.major}));
+    await (await _activeFile()).writeAsString(jsonEncode({'major': version.major}));
   }
 
   static Future<void> install(
@@ -66,39 +64,24 @@ class JdkService {
     void Function(double progress, String status)? onProgress,
   }) async {
     if (!Platform.isAndroid) {
-      throw UnsupportedError('DroidForge v7 supports Android only.');
+      throw UnsupportedError('DroidForge V9 supports Android only.');
     }
-    if (version.major != 17) {
-      throw UnsupportedError('Only Android-compatible JDK 17 is supported.');
+    if (!version.available) {
+      throw UnsupportedError('${version.label} is Coming Soon.');
     }
 
-    onProgress?.call(0.05, 'Checking Android runtime package...');
-
-    // Important: desktop/Linux Temurin archives are intentionally not used.
-    // Android cannot safely execute a downloaded desktop JDK from app storage.
-    // The next implementation step is a native Android runtime component that
-    // ships executable code through the APK native-library directory.
+    onProgress?.call(0.1, 'Checking Android ARM64 runtime package...');
     throw UnsupportedError(
-      'Android-native JDK 17 runtime component is not bundled yet. '
-      'DroidForge no longer downloads Linux/Desktop JDK archives. '
-      'The runtime must be packaged inside the APK as Android ARM64 native code.',
+      'JDK 17 UI is ready, but a verified Android ARM64 Java runtime bundle is not included in this ZIP. '
+      'Desktop/Linux JDK archives are intentionally blocked because Android cannot execute them reliably.',
     );
   }
 
-  static Future<bool> _isAndroidJavaExecutable(Directory home) async {
-    if (!Platform.isAndroid) return false;
-    final java = File('${home.path}/bin/java');
+  static Future<bool> _verifyJava(Directory javaHome) async {
+    final java = File('${javaHome.path}/bin/java');
     if (!await java.exists()) return false;
     try {
-      final result = await Process.run(
-        java.path,
-        const ['-version'],
-        environment: {
-          ...Platform.environment,
-          'JAVA_HOME': home.path,
-          'PATH': '${home.path}/bin:${Platform.environment['PATH'] ?? ''}',
-        },
-      );
+      final result = await Process.run(java.path, ['-version']);
       return result.exitCode == 0;
     } catch (_) {
       return false;
@@ -107,8 +90,13 @@ class JdkService {
 
   static Future<Directory?> _findJavaHome(Directory root) async {
     if (!await root.exists()) return null;
-    final directJava = File('${root.path}/bin/java');
-    if (await directJava.exists()) return root;
+    final direct = File('${root.path}/bin/java');
+    if (await direct.exists()) return root;
+    await for (final entity in root.list(recursive: true, followLinks: false)) {
+      if (entity is File && entity.path.endsWith('/bin/java')) {
+        return Directory(entity.path.substring(0, entity.path.length - 9));
+      }
+    }
     return null;
   }
 }
