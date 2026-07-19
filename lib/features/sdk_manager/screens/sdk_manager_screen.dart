@@ -94,8 +94,8 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
             child: Column(
               children: [
                 _packageTile(
-                  'Command-line Tools',
-                  'sdkmanager and Android command-line utilities',
+                  'Android SDK Runtime',
+                  'Android ARM64 SDK component',
                   value?.commandLineTools ?? false,
                 ),
                 const Divider(height: 1),
@@ -121,7 +121,7 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Starting installation downloads Google Android SDK packages and accepts the Android SDK license prompts for these packages.',
+            'V8 blocks incompatible desktop SDK packages. Installation will be enabled only after an Android ARM64 SDK component is bundled.',
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
@@ -153,7 +153,7 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
           ],
           const SizedBox(height: 12),
           const Text(
-            'Compatibility note: package download may succeed even when a downloaded JDK or native SDK tool is not executable on Android/ARM64. DroidForge now verifies Java before running sdkmanager and reports the exact failure in Installation output.',
+            'Android-only status: desktop, server and non-Android execution paths have been removed. JDK and SDK installation remain disabled until verified Android ARM64 components are bundled.',
             style: TextStyle(fontSize: 12),
           ),
         ],

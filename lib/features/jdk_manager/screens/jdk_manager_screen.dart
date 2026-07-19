@@ -88,7 +88,7 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Select the JDK DroidForge should use for Gradle builds.',
+            'Android-only runtime manager. JDK 17 is the first supported Gradle runtime.',
             style: TextStyle(fontSize: 15),
           ),
           const SizedBox(height: 16),
@@ -110,7 +110,7 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
                     : Text(
                         installed.contains(version.major)
                             ? (active?.major == version.major ? 'Active JDK for Gradle' : 'Installed')
-                            : 'Tap to download and install',
+                            : 'Android runtime package required',
                       ),
                 trailing: active?.major == version.major
                     ? const Icon(Icons.check_circle)
