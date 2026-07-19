@@ -1,6 +1,7 @@
 package com.hamid.droidforge
 
 import android.os.Build
+import android.os.Looper
 import android.system.Os
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -9,6 +10,13 @@ import java.io.File
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
+    companion object {
+        init {
+            System.loadLibrary("droidforge_runtime")
+        }
+    }
+
+    private external fun nativeHealthCheck(): String
     private val executor = Executors.newCachedThreadPool()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -18,16 +26,21 @@ class MainActivity : FlutterActivity() {
             "com.hamid.droidforge/runtime"
         ).setMethodCallHandler { call, result ->
             when (call.method) {
-                "runtimeInfo" -> result.success(
-                    mapOf(
-                        "abi" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"),
-                        "nativeLibraryDir" to applicationInfo.nativeLibraryDir,
-                        "filesDir" to filesDir.absolutePath,
-                        "cacheDir" to cacheDir.absolutePath,
-                        "sdkInt" to Build.VERSION.SDK_INT
-                    )
-                )
-
+                "runtimeInfo" -> result.success(runtimeInfoMap())
+                "prepareEnvironment" -> executor.execute {
+                    try {
+                        val layout = prepareEnvironment()
+                        runOnUiThread { result.success(layout) }
+                    } catch (error: Throwable) {
+                        runOnUiThread {
+                            result.error("ENVIRONMENT_FAILED", safeMessage(error), null)
+                        }
+                    }
+                }
+                "foundationHealthCheck" -> executor.execute {
+                    val report = runFoundationHealthCheck()
+                    runOnUiThread { result.success(report) }
+                }
                 "chmodExecutable" -> {
                     val path = call.argument<String>("path")
                     if (path.isNullOrBlank()) {
@@ -37,11 +50,10 @@ class MainActivity : FlutterActivity() {
                             Os.chmod(path, 448) // 0700
                             result.success(null)
                         } catch (error: Throwable) {
-                            result.error("CHMOD_FAILED", error.message, null)
+                            result.error("CHMOD_FAILED", safeMessage(error), null)
                         }
                     }
                 }
-
                 "runProcess" -> {
                     val executable = call.argument<String>("executable")
                     val arguments = call.argument<List<String>>("arguments") ?: emptyList()
@@ -53,38 +65,178 @@ class MainActivity : FlutterActivity() {
                     }
                     executor.execute {
                         try {
-                            val command = mutableListOf(executable)
-                            command.addAll(arguments)
-                            val builder = ProcessBuilder(command)
-                            if (!workingDirectory.isNullOrBlank()) {
-                                builder.directory(File(workingDirectory))
-                            }
-                            builder.environment().putAll(environment)
-                            val process = builder.start()
-                            val stdout = process.inputStream.bufferedReader().use { it.readText() }
-                            val stderr = process.errorStream.bufferedReader().use { it.readText() }
-                            val exitCode = process.waitFor()
-                            runOnUiThread {
-                                result.success(
-                                    mapOf(
-                                        "exitCode" to exitCode,
-                                        "stdout" to stdout,
-                                        "stderr" to stderr
-                                    )
-                                )
-                            }
+                            val processResult = runProcess(
+                                executable,
+                                arguments,
+                                workingDirectory,
+                                environment
+                            )
+                            runOnUiThread { result.success(processResult) }
                         } catch (error: Throwable) {
                             runOnUiThread {
-                                result.error("PROCESS_FAILED", error.message, error.javaClass.name)
+                                result.error("PROCESS_FAILED", safeMessage(error), error.javaClass.name)
                             }
                         }
                     }
                 }
-
                 else -> result.notImplemented()
             }
         }
     }
+
+    private fun runtimeInfoMap(): Map<String, Any> = mapOf(
+        "abi" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"),
+        "nativeLibraryDir" to applicationInfo.nativeLibraryDir,
+        "filesDir" to filesDir.absolutePath,
+        "cacheDir" to cacheDir.absolutePath,
+        "sdkInt" to Build.VERSION.SDK_INT
+    )
+
+    private fun prepareEnvironment(): Map<String, String> {
+        val root = File(filesDir, "DroidForge/runtime")
+        val layout = linkedMapOf(
+            "root" to root,
+            "home" to File(root, "home"),
+            "tmp" to File(cacheDir, "droidforge-tmp"),
+            "downloads" to File(root, "downloads"),
+            "payloads" to File(root, "payloads"),
+            "logs" to File(root, "logs"),
+            "jdk" to File(root, "jdk"),
+            "sdk" to File(root, "sdk"),
+            "gradle" to File(root, "gradle")
+        )
+        layout.values.forEach { directory ->
+            if (!directory.exists() && !directory.mkdirs()) {
+                error("Could not create ${directory.absolutePath}")
+            }
+        }
+        return layout.mapValues { it.value.absolutePath }
+    }
+
+    private fun runFoundationHealthCheck(): Map<String, Any> {
+        val logs = mutableListOf<String>()
+        val checks = linkedMapOf<String, Boolean>()
+        val details = linkedMapOf<String, String>()
+
+        fun record(name: String, passed: Boolean, detail: String) {
+            checks[name] = passed
+            details[name] = detail
+            logs += "${if (passed) "PASS" else "FAIL"}: $name — $detail"
+        }
+
+        val abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"
+        record("arm64", abi == "arm64-v8a", "Detected ABI: $abi")
+
+        try {
+            val nativeResult = nativeHealthCheck()
+            record(
+                "nativeLibrary",
+                nativeResult.startsWith("droidforge-native-ok") && nativeResult.contains("arch=arm64"),
+                nativeResult
+            )
+        } catch (error: Throwable) {
+            record("nativeLibrary", false, safeMessage(error))
+        }
+
+        record(
+            "backgroundWorker",
+            Looper.myLooper() != Looper.getMainLooper(),
+            "Health check thread: ${Thread.currentThread().name}"
+        )
+
+        val layout = try {
+            prepareEnvironment().also {
+                record("directoryLayout", true, "Created ${it.size} runtime directories")
+            }
+        } catch (error: Throwable) {
+            record("directoryLayout", false, safeMessage(error))
+            emptyMap()
+        }
+
+        try {
+            val tmpPath = layout["tmp"] ?: cacheDir.absolutePath
+            val probe = File(tmpPath, "foundation-probe-${System.nanoTime()}.txt")
+            val expected = "droidforge-file-io-ok"
+            probe.writeText(expected)
+            val actual = probe.readText()
+            val deleted = probe.delete()
+            record("fileIo", actual == expected && deleted, "Write/read/delete test completed")
+        } catch (error: Throwable) {
+            record("fileIo", false, safeMessage(error))
+        }
+
+        try {
+            val process = runProcess(
+                "/system/bin/sh",
+                listOf("-c", "printf droidforge-process-ok"),
+                layout["home"],
+                mapOf(
+                    "HOME" to (layout["home"] ?: filesDir.absolutePath),
+                    "TMPDIR" to (layout["tmp"] ?: cacheDir.absolutePath),
+                    "PATH" to "/system/bin:/system/xbin"
+                )
+            )
+            val stdout = process["stdout"] as? String ?: ""
+            val exitCode = process["exitCode"] as? Int ?: -1
+            record(
+                "processRunner",
+                exitCode == 0 && stdout == "droidforge-process-ok",
+                "exit=$exitCode stdout=$stdout"
+            )
+        } catch (error: Throwable) {
+            record("processRunner", false, safeMessage(error))
+        }
+
+        val required = listOf(
+            "arm64",
+            "nativeLibrary",
+            "backgroundWorker",
+            "directoryLayout",
+            "fileIo",
+            "processRunner"
+        )
+        val ready = required.all { checks[it] == true }
+        return mapOf(
+            "ready" to ready,
+            "checks" to checks,
+            "details" to details,
+            "logs" to logs,
+            "environment" to layout,
+            "runtimeInfo" to runtimeInfoMap()
+        )
+    }
+
+    private fun runProcess(
+        executable: String,
+        arguments: List<String>,
+        workingDirectory: String?,
+        environment: Map<String, String>
+    ): Map<String, Any> {
+        val command = mutableListOf(executable)
+        command.addAll(arguments)
+        val builder = ProcessBuilder(command)
+        if (!workingDirectory.isNullOrBlank()) {
+            builder.directory(File(workingDirectory))
+        }
+        builder.environment().putAll(environment)
+        val process = builder.start()
+
+        val stdoutFuture = executor.submit<String> {
+            process.inputStream.bufferedReader().use { it.readText() }
+        }
+        val stderrFuture = executor.submit<String> {
+            process.errorStream.bufferedReader().use { it.readText() }
+        }
+        val exitCode = process.waitFor()
+        return mapOf(
+            "exitCode" to exitCode,
+            "stdout" to stdoutFuture.get(),
+            "stderr" to stderrFuture.get()
+        )
+    }
+
+    private fun safeMessage(error: Throwable): String =
+        error.message?.take(500) ?: error.javaClass.simpleName
 
     override fun onDestroy() {
         executor.shutdownNow()

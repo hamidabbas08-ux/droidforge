@@ -70,6 +70,7 @@ class JdkService {
     if (!Platform.isAndroid) {
       throw UnsupportedError('DroidForge supports Android only.');
     }
+    await NativeRuntimeService.requireHealthyFoundation();
     if (!version.available) {
       throw UnsupportedError('${version.label} is Coming Soon.');
     }

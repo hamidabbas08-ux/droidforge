@@ -62,6 +62,7 @@ class AndroidSdkService {
     if (!Platform.isAndroid) {
       throw UnsupportedError('DroidForge supports Android only.');
     }
+    await NativeRuntimeService.requireHealthyFoundation();
     final javaHome = await JdkService.activeJavaHome();
     if (javaHome == null) {
       throw Exception('Install and verify JDK 17 before installing the Android SDK.');

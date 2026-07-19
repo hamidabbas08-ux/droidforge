@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../jdk_manager/screens/jdk_manager_screen.dart';
 import '../../sdk_manager/screens/sdk_manager_screen.dart';
 import '../../execution/screens/execution_settings_screen.dart';
+import '../../runtime/screens/runtime_foundation_screen.dart';
 import 'new_project_screen.dart';
 
 class ProjectsScreen extends StatelessWidget {
@@ -25,6 +26,22 @@ class ProjectsScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const NewProjectScreen()),
+                );
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.health_and_safety),
+              title: const Text("Runtime Foundation"),
+              subtitle: const Text("Test the Android ARM64 build environment"),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const RuntimeFoundationScreen(),
+                  ),
                 );
               },
             ),
