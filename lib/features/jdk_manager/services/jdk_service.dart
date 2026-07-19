@@ -3,10 +3,14 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/runtime_archive_installer.dart';
+import '../../../core/runtime/native_runtime_service.dart';
 import '../models/jdk_version.dart';
 
 class JdkService {
   static const _activeFileName = 'active-jdk.json';
+  static const _jdk17Url =
+      'https://github.com/itsaky/openjdk-17-android/releases/download/01-01-2022/jdk17-arm64.tar.xz';
 
   static Future<Directory> _root() async {
     final base = await getApplicationSupportDirectory();
@@ -64,25 +68,66 @@ class JdkService {
     void Function(double progress, String status)? onProgress,
   }) async {
     if (!Platform.isAndroid) {
-      throw UnsupportedError('DroidForge V9 supports Android only.');
+      throw UnsupportedError('DroidForge supports Android only.');
     }
     if (!version.available) {
       throw UnsupportedError('${version.label} is Coming Soon.');
     }
+    if (version.major != 17) {
+      throw UnsupportedError('${version.label} is Coming Soon.');
+    }
 
-    onProgress?.call(0.1, 'Checking Android ARM64 runtime package...');
-    throw UnsupportedError(
-      'JDK 17 UI is ready, but a verified Android ARM64 Java runtime bundle is not included in this ZIP. '
-      'Desktop/Linux JDK archives are intentionally blocked because Android cannot execute them reliably.',
+    final installDir = await installDirectory(version);
+    if (await installDir.exists()) await installDir.delete(recursive: true);
+    await installDir.create(recursive: true);
+
+    final cache = Directory('${installDir.parent.path}/downloads');
+    final archive = File('${cache.path}/jdk17-arm64.tar.xz');
+    await RuntimeArchiveInstaller.download(
+      uri: Uri.parse(_jdk17Url),
+      destination: archive,
+      onProgress: (p, s) => onProgress?.call(p * 0.65, s),
     );
+    await RuntimeArchiveInstaller.extractTarXz(
+      archiveFile: archive,
+      destination: installDir,
+      onProgress: (p, s) => onProgress?.call(0.65 + p * 0.25, s),
+    );
+    await RuntimeArchiveInstaller.makeExecutableTree(installDir);
+
+    final home = await _findJavaHome(installDir);
+    if (home == null) {
+      throw Exception('JDK archive extracted, but bin/java was not found.');
+    }
+    onProgress?.call(0.93, 'Verifying Java runtime...');
+    if (!await _verifyJava(home)) {
+      throw Exception(
+        'Android JDK 17 was downloaded but could not execute. '
+        'This device may block executables from app storage.',
+      );
+    }
+    await (await _activeFile()).writeAsString(jsonEncode({'major': 17}));
+    onProgress?.call(1, 'JDK 17 installed and selected');
   }
 
   static Future<bool> _verifyJava(Directory javaHome) async {
     final java = File('${javaHome.path}/bin/java');
     if (!await java.exists()) return false;
     try {
-      final result = await Process.run(java.path, ['-version']);
-      return result.exitCode == 0;
+      final info = await NativeRuntimeService.runtimeInfo();
+      if (!info.isArm64) return false;
+      await NativeRuntimeService.chmodExecutable(java.path);
+      final result = await NativeRuntimeService.run(
+        executable: java.path,
+        arguments: const ['-version'],
+        environment: {
+          'JAVA_HOME': javaHome.path,
+          'HOME': javaHome.parent.path,
+          'TMPDIR': Directory.systemTemp.path,
+          'LD_LIBRARY_PATH': '${javaHome.path}/lib:${javaHome.path}/lib/server',
+        },
+      );
+      return result.success;
     } catch (_) {
       return false;
     }

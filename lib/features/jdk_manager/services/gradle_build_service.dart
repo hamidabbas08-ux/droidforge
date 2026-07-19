@@ -1,7 +1,6 @@
-import 'dart:convert';
-import 'dart:async';
 import 'dart:io';
 
+import '../../../core/runtime/native_runtime_service.dart';
 import '../../sdk_manager/services/android_sdk_service.dart';
 import 'jdk_service.dart';
 
@@ -21,18 +20,17 @@ class GradleBuildService {
   }) async {
     final javaHome = await JdkService.activeJavaHome();
     if (javaHome == null) {
-      throw Exception('Install and select a JDK in JDK Manager first.');
+      throw Exception('Install and select a verified JDK 17 first.');
     }
 
     final sdkStatus = await AndroidSdkService.status();
     if (!sdkStatus.ready) {
-      throw Exception('Install the required packages in Android SDK Manager first.');
+      throw Exception('Install and verify the Android SDK first.');
     }
 
-    if (!Platform.isAndroid) {
-      throw UnsupportedError(
-        'Gradle process execution requires DroidForge to run in Linux/Ubuntu.',
-      );
+    final info = await NativeRuntimeService.runtimeInfo();
+    if (!info.isArm64) {
+      throw UnsupportedError('DroidForge V11 supports arm64-v8a Android devices only.');
     }
 
     await AndroidSdkService.writeLocalProperties(projectPath);
@@ -40,52 +38,40 @@ class GradleBuildService {
     final rootGradlew = File('$projectPath/gradlew');
     final androidGradlew = File('$projectPath/android/gradlew');
     late final String workingDirectory;
-    late final String command;
+    late final String executable;
 
     if (await rootGradlew.exists()) {
       workingDirectory = projectPath;
-      command = './gradlew';
-      await Process.run('chmod', ['+x', rootGradlew.path]);
+      executable = rootGradlew.path;
     } else if (await androidGradlew.exists()) {
       workingDirectory = '$projectPath/android';
-      command = './gradlew';
-      await Process.run('chmod', ['+x', androidGradlew.path]);
+      executable = androidGradlew.path;
     } else {
-      workingDirectory = projectPath;
-      command = 'gradle';
+      throw Exception('Gradle wrapper was not found in the selected project.');
     }
 
+    await NativeRuntimeService.chmodExecutable(executable);
     final sdkPath = sdkStatus.sdkPath;
-    final process = await Process.start(
-      'bash',
-      ['-lc', '$command assembleDebug'],
+    final result = await NativeRuntimeService.run(
+      executable: '/system/bin/sh',
+      arguments: [executable, 'assembleDebug', '--stacktrace'],
       workingDirectory: workingDirectory,
       environment: {
-        ...Platform.environment,
         'JAVA_HOME': javaHome,
         'GRADLE_JAVA_HOME': javaHome,
         'ANDROID_HOME': sdkPath,
-        // Kept for compatibility with tools that still read the old name.
         'ANDROID_SDK_ROOT': sdkPath,
-        'PATH': '$javaHome/bin:$sdkPath/cmdline-tools/latest/bin:'
-            '$sdkPath/platform-tools:${Platform.environment['PATH'] ?? ''}',
+        'HOME': info.filesDir,
+        'TMPDIR': info.cacheDir,
+        'PATH': '$javaHome/bin:$sdkPath/cmdline-tools/latest/bin:$sdkPath/platform-tools:/system/bin',
+        'LD_LIBRARY_PATH': '$javaHome/lib:$javaHome/lib/server:${info.nativeLibraryDir}',
       },
-      runInShell: false,
     );
 
-    final output = StringBuffer();
-
-    Future<void> consume(Stream<List<int>> stream) async {
-      await for (final chunk in stream
-          .transform(SystemEncoding().decoder)
-          .transform(const LineSplitter())) {
-        output.writeln(chunk);
-        onOutput?.call(chunk);
-      }
+    final combined = '${result.stdout}\n${result.stderr}'.trim();
+    for (final line in combined.split('\n')) {
+      if (line.isNotEmpty) onOutput?.call(line);
     }
-
-    await Future.wait([consume(process.stdout), consume(process.stderr)]);
-    final code = await process.exitCode;
-    return GradleBuildResult(code, output.toString());
+    return GradleBuildResult(result.exitCode, combined);
   }
 }
