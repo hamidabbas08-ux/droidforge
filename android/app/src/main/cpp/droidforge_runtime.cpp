@@ -206,10 +206,31 @@ static jobject startEmbeddedJvmImpl(
         stderrText = "Existing embedded JVM could not attach current thread: " + std::to_string(attach);
       }
     } else {
-      const std::string jvmPath = nativeLibraryDir + "/libjvm.so";
-      void* handle = dlopen(jvmPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
+      const std::string runtimeLibDir = javaHome + "/lib";
+      const std::string serverLibDir = runtimeLibDir + "/server";
+      const std::string tmpDir = javaHome + "/tmp";
+      const std::string libraryPath = serverLibDir + ":" + runtimeLibDir + ":" + nativeLibraryDir;
+      setenv("JAVA_HOME", javaHome.c_str(), 1);
+      setenv("HOME", javaHome.c_str(), 1);
+      setenv("TMPDIR", tmpDir.c_str(), 1);
+      setenv("LD_LIBRARY_PATH", libraryPath.c_str(), 1);
+      chdir(javaHome.c_str());
+
+      const std::vector<std::string> preloadNames = {
+          "libjimage.so", "libjava.so", "libverify.so", "libzip.so"};
+      for (const auto& name : preloadNames) {
+        const std::string path = runtimeLibDir + "/" + name;
+        void* preload = dlopen(path.c_str(), RTLD_NOW | RTLD_GLOBAL);
+        if (preload == nullptr) {
+          stderrText = "preload " + name + " failed: " + std::string(dlerror());
+          break;
+        }
+      }
+
+      const std::string jvmPath = serverLibDir + "/libjvm.so";
+      void* handle = stderrText.empty() ? dlopen(jvmPath.c_str(), RTLD_NOW | RTLD_GLOBAL) : nullptr;
       if (handle == nullptr) {
-        stderrText = std::string("dlopen libjvm failed: ") + dlerror();
+        if (stderrText.empty()) stderrText = std::string("dlopen libjvm failed: ") + dlerror();
       } else {
         auto createVm = reinterpret_cast<CreateJavaVm>(dlsym(handle, "JNI_CreateJavaVM"));
         if (createVm == nullptr) {
@@ -217,14 +238,18 @@ static jobject startEmbeddedJvmImpl(
         } else {
           std::vector<std::string> optionStorage = {
               "-Djava.home=" + javaHome,
-              "-Djava.library.path=" + nativeLibraryDir,
-              "-Djava.io.tmpdir=" + javaHome + "/tmp",
+              "-Dsun.boot.library.path=" + runtimeLibDir,
+              "-Djava.library.path=" + libraryPath,
+              "-Djava.io.tmpdir=" + tmpDir,
               "-Duser.home=" + javaHome,
+              "-Duser.dir=" + javaHome,
               "-Dfile.encoding=UTF-8",
+              "-Djava.awt.headless=true",
+              "-XX:+UseSerialGC",
               "-XX:-UsePerfData",
               "-Xrs",
               "-Xms16m",
-              "-Xmx256m",
+              "-Xmx192m",
           };
           std::vector<JavaVMOption> options(optionStorage.size());
           for (size_t i = 0; i < optionStorage.size(); ++i) {

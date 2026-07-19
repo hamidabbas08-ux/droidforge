@@ -223,11 +223,15 @@ class MainActivity : FlutterActivity() {
     private fun prepareEmbeddedJdk(): String {
         val javaHome = File(filesDir, "DroidForge/runtime/jdk/jdk17-embedded")
         val marker = File(javaHome, ".foundation-ready")
-        if (!marker.exists()) {
+        val expectedFoundationVersion = "v11.7"
+        val installedFoundationVersion = marker.takeIf { it.isFile }?.readText()?.trim()
+        if (installedFoundationVersion != expectedFoundationVersion) {
             if (javaHome.exists()) javaHome.deleteRecursively()
-            javaHome.mkdirs()
+            if (!javaHome.mkdirs() && !javaHome.isDirectory) {
+                error("Could not create embedded JDK directory")
+            }
             copyAssetTree("jdk17", javaHome)
-            marker.writeText("v11.5")
+            marker.writeText(expectedFoundationVersion)
         }
 
         val libDir = File(javaHome, "lib").apply { mkdirs() }
@@ -238,14 +242,23 @@ class MainActivity : FlutterActivity() {
             val destination = if (name == "libjvm.so") File(serverDir, name) else File(libDir, name)
             if (!source.exists()) error("APK native library missing: $name")
             if (destination.exists() || destination.isSymbolicLink()) destination.delete()
-            try {
-                Os.symlink(source.absolutePath, destination.absolutePath)
-            } catch (_: Throwable) {
-                source.inputStream().use { input ->
-                    FileOutputStream(destination).use { output -> input.copyTo(output) }
+            source.inputStream().use { input ->
+                FileOutputStream(destination).use { output ->
+                    input.copyTo(output, 1024 * 1024)
                 }
             }
+            destination.setReadable(true, false)
+            destination.setExecutable(true, false)
         }
+        val modules = File(javaHome, "lib/modules")
+        val security = File(javaHome, "conf/security/java.security")
+        val jvm = File(javaHome, "lib/server/libjvm.so")
+        if (!modules.isFile || modules.length() < 50L * 1024L * 1024L) {
+            error("Embedded JDK modules image is missing or incomplete")
+        }
+        if (!security.isFile) error("Embedded JDK security configuration is missing")
+        if (!jvm.isFile) error("Embedded JVM library is missing")
+        File(javaHome, "tmp").mkdirs()
         return javaHome.absolutePath
     }
 

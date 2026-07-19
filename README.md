@@ -49,3 +49,11 @@ an x86-64 translation layer.
 ## v4 execution-engine foundation
 
 This build adds an Execution Environment screen and a central execution engine abstraction for Android local shell, direct Linux, Termux bridge, and Ubuntu PRoot modes. Direct Linux and Android local-shell execution are implemented. Termux/Ubuntu bridge modes are intentionally guarded until the native bridge is added, because Android APK, Termux, and PRoot Ubuntu are separate sandboxes.
+
+
+## V11.7 extracted runtime startup
+- Extracts the complete JDK 17 runtime image into app-internal storage.
+- Copies native JVM libraries into the extracted runtime layout.
+- Starts HotSpot only in the isolated `:runtime_probe` process.
+- Sets JAVA_HOME, boot library path, native library path, HOME, TMPDIR, and conservative JVM options before startup.
+- Verifies `lib/modules`, `java.security`, and `libjvm.so` before probing.

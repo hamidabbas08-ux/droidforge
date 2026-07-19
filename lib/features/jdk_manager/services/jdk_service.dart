@@ -71,13 +71,13 @@ class JdkService {
     onProgress?.call(0.10, 'Preparing APK-bundled JDK 17 runtime...');
     final javaHome = await NativeRuntimeService.prepareEmbeddedJdk();
 
-    onProgress?.call(0.75, 'Starting JVM inside DroidForge process...');
+    onProgress?.call(0.75, 'Starting JDK 17 in isolated runtime process...');
     final result = await NativeRuntimeService.startEmbeddedJvm(
       javaHome: javaHome,
     );
     if (!result.success || !result.stdout.contains('embedded-jvm-ok')) {
       final detail = result.stderr.isNotEmpty ? result.stderr : result.stdout;
-      throw Exception('In-process JDK 17 test failed: $detail');
+      throw Exception('Isolated JDK 17 startup failed: $detail');
     }
 
     await (await _activeFile()).writeAsString(jsonEncode({'major': 17}));
