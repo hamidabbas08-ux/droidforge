@@ -30,9 +30,7 @@ class GradleBuildService {
     }
 
     if (!Platform.isAndroid) {
-      throw UnsupportedError(
-        'Gradle process execution requires DroidForge to run in Linux/Ubuntu.',
-      );
+      throw UnsupportedError('Gradle execution is available only on Android in this build.');
     }
 
     await AndroidSdkService.writeLocalProperties(projectPath);
@@ -45,20 +43,24 @@ class GradleBuildService {
     if (await rootGradlew.exists()) {
       workingDirectory = projectPath;
       command = './gradlew';
-      await Process.run('chmod', ['+x', rootGradlew.path]);
+      await Process.run('/system/bin/chmod', ['+x', rootGradlew.path]);
     } else if (await androidGradlew.exists()) {
       workingDirectory = '$projectPath/android';
       command = './gradlew';
-      await Process.run('chmod', ['+x', androidGradlew.path]);
+      await Process.run('/system/bin/chmod', ['+x', androidGradlew.path]);
     } else {
       workingDirectory = projectPath;
       command = 'gradle';
     }
 
     final sdkPath = sdkStatus.sdkPath;
+    if (command == 'gradle') {
+      throw Exception('Gradle wrapper was not found in this project.');
+    }
+
     final process = await Process.start(
-      'bash',
-      ['-lc', '$command assembleDebug'],
+      '/system/bin/sh',
+      [command, 'assembleDebug'],
       workingDirectory: workingDirectory,
       environment: {
         ...Platform.environment,

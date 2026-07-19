@@ -153,7 +153,7 @@ class _SdkManagerScreenState extends State<SdkManagerScreen> {
           ],
           const SizedBox(height: 12),
           const Text(
-            'ARM64 note: Google distributes some Linux SDK binaries primarily for x86-64. In an ARM64 PRoot/Ubuntu setup, package download can succeed while native tools such as adb or aapt2 may still require an ARM64-compatible replacement or translation layer.',
+            'Compatibility note: package download may succeed even when a downloaded JDK or native SDK tool is not executable on Android/ARM64. DroidForge now verifies Java before running sdkmanager and reports the exact failure in Installation output.',
             style: TextStyle(fontSize: 12),
           ),
         ],

@@ -86,23 +86,50 @@ class AndroidSdkService {
 
     // sdkmanager asks for licenses on stdin. The UI explicitly informs the
     // user that starting installation accepts the Android SDK license terms.
+    // sdkmanager is a shell script. Android can refuse direct execution of
+    // files extracted into app storage even after chmod. Run it explicitly
+    // through Android's system shell instead of Process.start(scriptPath).
+    final environment = {
+      ...Platform.environment,
+      'JAVA_HOME': javaHome,
+      'ANDROID_HOME': root.path,
+      'ANDROID_SDK_ROOT': root.path,
+      'PATH': '$javaHome/bin:${root.path}/cmdline-tools/latest/bin:'
+          '${root.path}/platform-tools:/system/bin:${Platform.environment['PATH'] ?? ''}',
+      'REPO_OS_OVERRIDE': 'linux',
+    };
+
+    ProcessResult javaCheck;
+    try {
+      javaCheck = await Process.run(
+        '$javaHome/bin/java',
+        ['-version'],
+        environment: environment,
+      );
+    } on ProcessException catch (error) {
+      throw Exception(
+        'The selected JDK file exists but Android could not execute it: '
+        '${error.message}. An Android/ARM64-compatible Java runtime is required.',
+      );
+    }
+    if (javaCheck.exitCode != 0) {
+      final details = '${javaCheck.stderr}${javaCheck.stdout}'.trim();
+      throw Exception(
+        'The selected JDK cannot execute on this Android device.'
+        '${details.isEmpty ? '' : ' Details: $details'}',
+      );
+    }
+
     final process = await Process.start(
-      sdkManager.path,
+      '/system/bin/sh',
       [
+        sdkManager.path,
         '--sdk_root=${root.path}',
         'platform-tools',
         'platforms;android-$apiLevel',
         'build-tools;$buildToolsVersion',
       ],
-      environment: {
-        ...Platform.environment,
-        'JAVA_HOME': javaHome,
-        'ANDROID_HOME': root.path,
-        'ANDROID_SDK_ROOT': root.path,
-        'PATH': '$javaHome/bin:${root.path}/cmdline-tools/latest/bin:'
-            '${root.path}/platform-tools:${Platform.environment['PATH'] ?? ''}',
-        'REPO_OS_OVERRIDE': 'linux',
-      },
+      environment: environment,
       runInShell: false,
     );
 
@@ -127,7 +154,7 @@ class AndroidSdkService {
     await Future.wait(outputTasks);
     final exitCode = await process.exitCode;
     if (exitCode != 0) {
-      throw Exception('sdkmanager failed with exit code $exitCode.');
+      throw Exception('sdkmanager failed with exit code $exitCode. Open Installation output for the exact error.');
     }
 
     final installed = await status();
