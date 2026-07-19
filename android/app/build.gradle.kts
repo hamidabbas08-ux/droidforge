@@ -10,8 +10,7 @@ android {
             useLegacyPackaging = true
         }
         resources {
-            noCompress += setOf("modules")
-        }
+                }
     }
 
     namespace = "com.hamid.droidforge"
