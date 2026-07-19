@@ -13,14 +13,12 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
     companion object {
         init {
-            System.loadLibrary("jvm")
             System.loadLibrary("droidforge_runtime")
         }
     }
 
     private external fun nativeHealthCheck(): String
     private external fun nativeLaunchJava(javaHome: String, nativeLibraryDir: String): HashMap<String, Any>
-    private external fun nativeStartEmbeddedJvm(javaHome: String, nativeLibraryDir: String): HashMap<String, Any>
     private val executor = Executors.newCachedThreadPool()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -75,14 +73,8 @@ class MainActivity : FlutterActivity() {
                         return@setMethodCallHandler
                     }
                     executor.execute {
-                        try {
-                            val vmResult = nativeStartEmbeddedJvm(javaHome, applicationInfo.nativeLibraryDir)
-                            runOnUiThread { result.success(vmResult) }
-                        } catch (error: Throwable) {
-                            runOnUiThread {
-                                result.error("EMBEDDED_JVM_FAILED", safeMessage(error), error.javaClass.name)
-                            }
-                        }
+                        val vmResult = probeEmbeddedJvmSafely(javaHome)
+                        runOnUiThread { result.success(vmResult) }
                     }
                 }
                 "launchJava" -> {
@@ -133,6 +125,70 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+
+    private fun probeEmbeddedJvmSafely(javaHome: String): HashMap<String, Any> {
+        val resultFile = File(filesDir, RuntimeProbeService.RESULT_FILE)
+        resultFile.delete()
+
+        val intent = android.content.Intent(this, RuntimeProbeService::class.java).apply {
+            action = RuntimeProbeService.ACTION_PROBE
+            putExtra(RuntimeProbeService.EXTRA_JAVA_HOME, javaHome)
+            putExtra(RuntimeProbeService.EXTRA_NATIVE_LIBRARY_DIR, applicationInfo.nativeLibraryDir)
+        }
+
+        val started = try {
+            startService(intent) != null
+        } catch (error: Throwable) {
+            return hashMapOf(
+                "exitCode" to -1,
+                "stdout" to "",
+                "stderr" to "Could not start isolated JVM probe: ${safeMessage(error)}",
+            )
+        }
+        if (!started) {
+            return hashMapOf(
+                "exitCode" to -1,
+                "stdout" to "",
+                "stderr" to "Android refused to start the isolated JVM probe service.",
+            )
+        }
+
+        val deadline = System.currentTimeMillis() + 20_000L
+        while (System.currentTimeMillis() < deadline) {
+            if (resultFile.exists()) {
+                return try {
+                    val lines = resultFile.readLines()
+                    hashMapOf(
+                        "exitCode" to (lines.getOrNull(0)?.toIntOrNull() ?: -1),
+                        "stdout" to decodeProbeValue(lines.getOrNull(1).orEmpty()),
+                        "stderr" to decodeProbeValue(lines.getOrNull(2).orEmpty()),
+                    )
+                } catch (error: Throwable) {
+                    hashMapOf(
+                        "exitCode" to -1,
+                        "stdout" to "",
+                        "stderr" to "Invalid isolated JVM probe result: ${safeMessage(error)}",
+                    )
+                } finally {
+                    resultFile.delete()
+                }
+            }
+            Thread.sleep(100L)
+        }
+
+        return hashMapOf(
+            "exitCode" to 134,
+            "stdout" to "",
+            "stderr" to "The isolated JVM process stopped or timed out. DroidForge remained open safely.",
+        )
+    }
+
+    private fun decodeProbeValue(value: String): String = try {
+        String(android.util.Base64.decode(value, android.util.Base64.DEFAULT), Charsets.UTF_8)
+    } catch (_: Throwable) {
+        value
     }
 
     private fun runtimeInfoMap(): Map<String, Any> = mapOf(

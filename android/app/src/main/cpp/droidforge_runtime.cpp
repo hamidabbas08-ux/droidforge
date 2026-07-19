@@ -185,10 +185,8 @@ static std::string describeAndClearJavaException(JNIEnv* env) {
   return message;
 }
 
-extern "C" JNIEXPORT jobject JNICALL
-Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
+static jobject startEmbeddedJvmImpl(
     JNIEnv* artEnv,
-    jobject /* thiz */,
     jstring javaHomeValue,
     jstring nativeLibraryDirValue) {
   const std::string javaHome = jstringToUtf8(artEnv, javaHomeValue);
@@ -234,7 +232,7 @@ Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
             options[i].extraInfo = nullptr;
           }
           JavaVMInitArgs args{};
-          args.version = JNI_VERSION_1_6;
+          args.version = JNI_VERSION_1_8;
           args.nOptions = static_cast<jint>(options.size());
           args.options = options.data();
           args.ignoreUnrecognized = JNI_FALSE;
@@ -288,4 +286,23 @@ Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
   putString(artEnv, map, put, "stderr", stderrText);
   artEnv->DeleteLocalRef(mapClass);
   return map;
+}
+
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
+    JNIEnv* env,
+    jobject /* thiz */,
+    jstring javaHomeValue,
+    jstring nativeLibraryDirValue) {
+  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue);
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_hamid_droidforge_RuntimeProbeService_nativeProbeEmbeddedJvm(
+    JNIEnv* env,
+    jobject /* thiz */,
+    jstring javaHomeValue,
+    jstring nativeLibraryDirValue) {
+  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue);
 }

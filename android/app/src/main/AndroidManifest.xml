@@ -30,6 +30,12 @@
 
         </activity>
 
+        <service
+            android:name=".RuntimeProbeService"
+            android:exported="false"
+            android:process=":runtime_probe"
+            android:stopWithTask="true" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2"/>
