@@ -130,6 +130,31 @@ class MainActivity : FlutterActivity() {
 
 
     private fun probeEmbeddedJvmSafely(javaHome: String): HashMap<String, Any> {
+        val first = runIsolatedProbeAttempt(javaHome, "minimal-practical", 25_000L)
+        if ((first["exitCode"] as? Number)?.toInt() == 0) return first
+
+        val second = runIsolatedProbeAttempt(javaHome, "absolute-minimum", 25_000L)
+        if ((second["exitCode"] as? Number)?.toInt() == 0) return second
+
+        return hashMapOf(
+            "exitCode" to 134,
+            "stdout" to "",
+            "stderr" to buildString {
+                append("FINAL RUNTIME DECISION: REJECTED\n")
+                append("Both permitted compatibility tests failed. No more tests will be run on this runtime.\n\n")
+                append("TEST 1 — minimal practical options:\n")
+                append(first["stderr"]?.toString().orEmpty())
+                append("\n\nTEST 2 — absolute minimum options:\n")
+                append(second["stderr"]?.toString().orEmpty())
+            },
+        )
+    }
+
+    private fun runIsolatedProbeAttempt(
+        javaHome: String,
+        probeMode: String,
+        timeoutMs: Long,
+    ): HashMap<String, Any> {
         val resultFile = File(filesDir, RuntimeProbeService.RESULT_FILE)
         val diagnosticFile = File(filesDir, RuntimeProbeService.DIAGNOSTIC_FILE)
         resultFile.delete()
@@ -139,6 +164,7 @@ class MainActivity : FlutterActivity() {
             action = RuntimeProbeService.ACTION_PROBE
             putExtra(RuntimeProbeService.EXTRA_JAVA_HOME, javaHome)
             putExtra(RuntimeProbeService.EXTRA_NATIVE_LIBRARY_DIR, applicationInfo.nativeLibraryDir)
+            putExtra(RuntimeProbeService.EXTRA_PROBE_MODE, probeMode)
         }
 
         val started = try {
@@ -147,18 +173,18 @@ class MainActivity : FlutterActivity() {
             return hashMapOf(
                 "exitCode" to -1,
                 "stdout" to "",
-                "stderr" to "Could not start isolated JVM probe: ${safeMessage(error)}",
+                "stderr" to "[$probeMode] Could not start isolated JVM probe: ${safeMessage(error)}",
             )
         }
         if (!started) {
             return hashMapOf(
                 "exitCode" to -1,
                 "stdout" to "",
-                "stderr" to "Android refused to start the isolated JVM probe service.",
+                "stderr" to "[$probeMode] Android refused to start the isolated JVM probe service.",
             )
         }
 
-        val deadline = System.currentTimeMillis() + 20_000L
+        val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             if (resultFile.exists()) {
                 return try {
@@ -167,9 +193,10 @@ class MainActivity : FlutterActivity() {
                         "exitCode" to (lines.getOrNull(0)?.toIntOrNull() ?: -1),
                         "stdout" to decodeProbeValue(lines.getOrNull(1).orEmpty()),
                         "stderr" to buildString {
+                            append("[$probeMode] ")
                             append(decodeProbeValue(lines.getOrNull(2).orEmpty()))
                             if (diagnosticFile.isFile) {
-                                append("\n\nJVM startup diagnostic:\n")
+                                append("\n\nNative diagnostic:\n")
                                 append(diagnosticFile.readText())
                             }
                         },
@@ -178,7 +205,7 @@ class MainActivity : FlutterActivity() {
                     hashMapOf(
                         "exitCode" to -1,
                         "stdout" to "",
-                        "stderr" to "Invalid isolated JVM probe result: ${safeMessage(error)}",
+                        "stderr" to "[$probeMode] Invalid probe result: ${safeMessage(error)}",
                     )
                 } finally {
                     resultFile.delete()
@@ -191,12 +218,12 @@ class MainActivity : FlutterActivity() {
             "exitCode" to 134,
             "stdout" to "",
             "stderr" to buildString {
-                append("The isolated JVM process stopped or timed out. DroidForge remained open safely.")
+                append("[$probeMode] JVM process stopped or timed out.")
                 if (diagnosticFile.isFile) {
-                    append("\n\nLast native startup stage:\n")
+                    append("\n\nLast native stages:\n")
                     append(diagnosticFile.readText())
                 } else {
-                    append("\nNo native diagnostic file was produced; the process may have failed before JNI entry.")
+                    append(" No native diagnostic was produced.")
                 }
             },
         )
@@ -240,7 +267,7 @@ class MainActivity : FlutterActivity() {
     private fun prepareEmbeddedJdk(): String {
         val javaHome = File(filesDir, "DroidForge/runtime/jdk/jdk17-embedded")
         val marker = File(javaHome, ".foundation-ready")
-        val expectedFoundationVersion = "v11.10"
+        val expectedFoundationVersion = "v11.11"
         val installedFoundationVersion = marker.takeIf { it.isFile }?.readText()?.trim()
 
         if (installedFoundationVersion != expectedFoundationVersion || !embeddedJdkImageIsComplete(javaHome)) {

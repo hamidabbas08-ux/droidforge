@@ -217,11 +217,13 @@ static jobject startEmbeddedJvmImpl(
     JNIEnv* artEnv,
     jstring javaHomeValue,
     jstring nativeLibraryDirValue,
-    jstring diagnosticPathValue) {
+    jstring diagnosticPathValue,
+    jstring probeModeValue) {
   const std::string javaHome = jstringToUtf8(artEnv, javaHomeValue);
   const std::string nativeLibraryDir = jstringToUtf8(artEnv, nativeLibraryDirValue);
   const std::string diagnosticPath = jstringToUtf8(artEnv, diagnosticPathValue);
-  appendDiagnostic(diagnosticPath, "01-native-entry");
+  const std::string probeMode = jstringToUtf8(artEnv, probeModeValue);
+  appendDiagnostic(diagnosticPath, "01-native-entry mode=" + probeMode);
   appendDiagnostic(diagnosticPath, "02-java-home=" + javaHome);
   appendDiagnostic(diagnosticPath, "03-native-lib-dir=" + nativeLibraryDir);
 
@@ -289,21 +291,28 @@ static jobject startEmbeddedJvmImpl(
           appendDiagnostic(diagnosticPath, "10-dlsym-failed|" + stderrText);
         } else {
           appendDiagnostic(diagnosticPath, "10-dlsym-success");
-          std::vector<std::string> optionStorage = {
-              "-Djava.home=" + javaHome,
-              "-Dsun.boot.library.path=" + runtimeLibDir,
-              "-Djava.library.path=" + libraryPath,
-              "-Djava.io.tmpdir=" + tmpDir,
-              "-Duser.home=" + javaHome,
-              "-Duser.dir=" + javaHome,
-              "-Dfile.encoding=UTF-8",
-              "-Djava.awt.headless=true",
-              "-XX:+UseSerialGC",
-              "-XX:-UsePerfData",
-              "-Xrs",
-              "-Xms16m",
-              "-Xmx192m",
-          };
+          std::vector<std::string> optionStorage;
+          bool ignoreUnrecognized = false;
+          if (probeMode == "absolute-minimum") {
+            // Final compatibility decision: only JAVA_HOME and a memory ceiling.
+            optionStorage = {
+                "-Djava.home=" + javaHome,
+                "-Xmx128m",
+            };
+            ignoreUnrecognized = true;
+          } else {
+            // Test 1: smallest practical embedded JVM configuration.
+            optionStorage = {
+                "-Djava.home=" + javaHome,
+                "-Djava.io.tmpdir=" + tmpDir,
+                "-Xms16m",
+                "-Xmx128m",
+                "-Xrs",
+            };
+          }
+          for (size_t i = 0; i < optionStorage.size(); ++i) {
+            appendDiagnostic(diagnosticPath, "11-option[" + std::to_string(i) + "]=" + optionStorage[i]);
+          }
           std::vector<JavaVMOption> options(optionStorage.size());
           for (size_t i = 0; i < optionStorage.size(); ++i) {
             options[i].optionString = optionStorage[i].data();
@@ -313,7 +322,7 @@ static jobject startEmbeddedJvmImpl(
           args.version = JNI_VERSION_1_6;
           args.nOptions = static_cast<jint>(options.size());
           args.options = options.data();
-          args.ignoreUnrecognized = JNI_FALSE;
+          args.ignoreUnrecognized = ignoreUnrecognized ? JNI_TRUE : JNI_FALSE;
           appendDiagnostic(diagnosticPath, "11-JNI_CreateJavaVM-call options=" + std::to_string(options.size()));
           const jint created = createVm(&g_embedded_vm, reinterpret_cast<void**>(&jvmEnv), &args);
           appendDiagnostic(diagnosticPath, "12-JNI_CreateJavaVM-return code=" + std::to_string(created));
@@ -382,8 +391,9 @@ Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
     jobject /* thiz */,
     jstring javaHomeValue,
     jstring nativeLibraryDirValue,
-    jstring diagnosticPathValue) {
-  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue, diagnosticPathValue);
+    jstring diagnosticPathValue,
+    jstring probeModeValue) {
+  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue, diagnosticPathValue, probeModeValue);
 }
 
 extern "C" JNIEXPORT jobject JNICALL
@@ -392,6 +402,7 @@ Java_com_hamid_droidforge_RuntimeProbeService_nativeProbeEmbeddedJvm(
     jobject /* thiz */,
     jstring javaHomeValue,
     jstring nativeLibraryDirValue,
-    jstring diagnosticPathValue) {
-  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue, diagnosticPathValue);
+    jstring diagnosticPathValue,
+    jstring probeModeValue) {
+  return startEmbeddedJvmImpl(env, javaHomeValue, nativeLibraryDirValue, diagnosticPathValue, probeModeValue);
 }

@@ -15,6 +15,7 @@ class RuntimeProbeService : Service() {
         const val ACTION_PROBE = "com.hamid.droidforge.PROBE_EMBEDDED_JVM"
         const val EXTRA_JAVA_HOME = "javaHome"
         const val EXTRA_NATIVE_LIBRARY_DIR = "nativeLibraryDir"
+        const val EXTRA_PROBE_MODE = "probeMode"
         const val RESULT_FILE = "runtime-probe-result.txt"
         const val DIAGNOSTIC_FILE = "jvm_startup.log"
 
@@ -27,6 +28,7 @@ class RuntimeProbeService : Service() {
         javaHome: String,
         nativeLibraryDir: String,
         diagnosticPath: String,
+        probeMode: String,
     ): HashMap<String, Any>
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -41,6 +43,7 @@ class RuntimeProbeService : Service() {
 
         val javaHome = intent.getStringExtra(EXTRA_JAVA_HOME).orEmpty()
         val nativeLibraryDir = intent.getStringExtra(EXTRA_NATIVE_LIBRARY_DIR).orEmpty()
+        val probeMode = intent.getStringExtra(EXTRA_PROBE_MODE).orEmpty().ifBlank { "minimal-practical" }
         val resultFile = File(filesDir, RESULT_FILE)
         val diagnosticFile = File(filesDir, DIAGNOSTIC_FILE)
         resultFile.delete()
@@ -48,7 +51,7 @@ class RuntimeProbeService : Service() {
 
         executor.execute {
             val text = try {
-                val result = nativeProbeEmbeddedJvm(javaHome, nativeLibraryDir, diagnosticFile.absolutePath)
+                val result = nativeProbeEmbeddedJvm(javaHome, nativeLibraryDir, diagnosticFile.absolutePath, probeMode)
                 val exitCode = (result["exitCode"] as? Number)?.toInt() ?: -1
                 val stdout = result["stdout"]?.toString().orEmpty()
                 val stderr = result["stderr"]?.toString().orEmpty()
