@@ -223,7 +223,7 @@ class MainActivity : FlutterActivity() {
     private fun prepareEmbeddedJdk(): String {
         val javaHome = File(filesDir, "DroidForge/runtime/jdk/jdk17-embedded")
         val marker = File(javaHome, ".foundation-ready")
-        val expectedFoundationVersion = "v11.8"
+        val expectedFoundationVersion = "v11.9"
         val installedFoundationVersion = marker.takeIf { it.isFile }?.readText()?.trim()
 
         if (installedFoundationVersion != expectedFoundationVersion || !embeddedJdkImageIsComplete(javaHome)) {
@@ -237,9 +237,10 @@ class MainActivity : FlutterActivity() {
             copyEmbeddedJdkFromManifest(javaHome)
             installNativeRuntimeLibraries(javaHome)
 
-            if (!embeddedJdkImageIsComplete(javaHome)) {
+            val verificationErrors = embeddedJdkVerificationErrors(javaHome)
+            if (verificationErrors.isNotEmpty()) {
                 marker.delete()
-                error("Embedded JDK extraction verification failed")
+                error("Embedded JDK extraction verification failed: " + verificationErrors.joinToString("; "))
             }
             marker.writeText(expectedFoundationVersion)
         } else {
@@ -308,29 +309,31 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun embeddedJdkImageIsComplete(javaHome: File): Boolean {
+    private fun embeddedJdkImageIsComplete(javaHome: File): Boolean =
+        embeddedJdkVerificationErrors(javaHome).isEmpty()
+
+    private fun embeddedJdkVerificationErrors(javaHome: File): List<String> {
+        val errors = mutableListOf<String>()
+        val expectedModulesSize = 128_712_865L
         val modules = File(javaHome, "lib/modules")
-        val sourceModulesSize = try {
-            assets.open("jdk17/lib/modules", android.content.res.AssetManager.ACCESS_STREAMING).use { input ->
-                var total = 0L
-                val buffer = ByteArray(1024 * 1024)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    total += count
-                }
-                total
-            }
-        } catch (_: Throwable) {
-            128_712_865L
+        val release = File(javaHome, "release")
+        val javaSecurity = File(javaHome, "conf/security/java.security")
+        val libJvm = File(javaHome, "lib/server/libjvm.so")
+
+        if (!modules.isFile) {
+            errors += "lib/modules missing"
+        } else if (modules.length() != expectedModulesSize) {
+            errors += "lib/modules size=${modules.length()} expected=$expectedModulesSize"
+        }
+        if (!release.isFile) errors += "release missing"
+        if (!javaSecurity.isFile) errors += "conf/security/java.security missing"
+        if (!libJvm.isFile) {
+            errors += "lib/server/libjvm.so missing (nativeLibraryDir=${applicationInfo.nativeLibraryDir})"
+        } else if (libJvm.length() < 1_000_000L) {
+            errors += "lib/server/libjvm.so incomplete size=${libJvm.length()}"
         }
 
-        return modules.isFile &&
-            modules.length() == sourceModulesSize &&
-            modules.length() > 100L * 1024L * 1024L &&
-            File(javaHome, "release").isFile &&
-            File(javaHome, "conf/security/java.security").isFile &&
-            File(javaHome, "lib/server/libjvm.so").isFile
+        return errors
     }
 
     private fun File.isSymbolicLink(): Boolean = try {
