@@ -43,7 +43,7 @@ class _RuntimeFoundationScreenState extends State<RuntimeFoundationScreen> {
   Widget build(BuildContext context) {
     final current = report;
     return Scaffold(
-      appBar: AppBar(title: const Text('Runtime Foundation')),
+      appBar: AppBar(title: const Text('Execution Foundation')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -75,7 +75,7 @@ class _RuntimeFoundationScreenState extends State<RuntimeFoundationScreen> {
                         ),
                         const SizedBox(height: 4),
                         const Text(
-                          'JDK and SDK work starts only after every foundation check passes.',
+                          'This is the clean execution base. JDK 17 work starts only after it passes.',
                         ),
                       ],
                     ),
@@ -130,7 +130,7 @@ class _RuntimeFoundationScreenState extends State<RuntimeFoundationScreen> {
           FilledButton.icon(
             onPressed: running ? null : _run,
             icon: const Icon(Icons.refresh),
-            label: const Text('Run Foundation Test Again'),
+            label: const Text('Run Execution Foundation Test'),
           ),
         ],
       ),

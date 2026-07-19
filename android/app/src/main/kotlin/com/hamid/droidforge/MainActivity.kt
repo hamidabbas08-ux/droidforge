@@ -244,21 +244,23 @@ class MainActivity : FlutterActivity() {
     )
 
     private fun prepareEnvironment(): Map<String, String> {
-        val root = File(filesDir, "DroidForge/runtime")
+        val root = File(filesDir, "DroidForge")
         val layout = linkedMapOf(
             "root" to root,
             "home" to File(root, "home"),
-            "tmp" to File(cacheDir, "droidforge-tmp"),
+            "projects" to File(root, "projects"),
+            "toolchains" to File(root, "toolchains"),
             "downloads" to File(root, "downloads"),
-            "payloads" to File(root, "payloads"),
-            "logs" to File(root, "logs"),
-            "jdk" to File(root, "jdk"),
-            "sdk" to File(root, "sdk"),
-            "gradle" to File(root, "gradle")
+            "cache" to File(root, "cache"),
+            "tmp" to File(root, "tmp"),
+            "logs" to File(root, "logs")
         )
         layout.values.forEach { directory ->
             if (!directory.exists() && !directory.mkdirs()) {
                 error("Could not create ${directory.absolutePath}")
+            }
+            if (!directory.isDirectory) {
+                error("Expected directory: ${directory.absolutePath}")
             }
         }
         return layout.mapValues { it.value.absolutePath }
@@ -435,7 +437,7 @@ class MainActivity : FlutterActivity() {
 
         val layout = try {
             prepareEnvironment().also {
-                record("directoryLayout", true, "Created ${it.size} runtime directories")
+                record("directoryLayout", true, "Created and verified ${it.size} foundation directories")
             }
         } catch (error: Throwable) {
             record("directoryLayout", false, safeMessage(error))
@@ -449,28 +451,42 @@ class MainActivity : FlutterActivity() {
             probe.writeText(expected)
             val actual = probe.readText()
             val deleted = probe.delete()
-            record("fileIo", actual == expected && deleted, "Write/read/delete test completed")
+            record("fileIo", actual == expected && deleted, "Write/read/delete completed in $tmpPath")
         } catch (error: Throwable) {
             record("fileIo", false, safeMessage(error))
         }
 
         try {
+            val home = layout["home"] ?: filesDir.absolutePath
+            val tmp = layout["tmp"] ?: cacheDir.absolutePath
+            val marker = "DROIDFORGE_FOUNDATION_OK"
+            val script = "printf 'stdout-ok\n'; printf 'stderr-ok\n' >&2; printf '%s\n' "\$PWD"; printf '%s\n' "\$DROIDFORGE_MARKER""
+            val startedAt = System.nanoTime()
             val process = runProcess(
                 "/system/bin/sh",
-                listOf("-c", "printf droidforge-process-ok"),
-                layout["home"],
+                listOf("-c", script),
+                home,
                 mapOf(
-                    "HOME" to (layout["home"] ?: filesDir.absolutePath),
-                    "TMPDIR" to (layout["tmp"] ?: cacheDir.absolutePath),
-                    "PATH" to "/system/bin:/system/xbin"
+                    "HOME" to home,
+                    "TMPDIR" to tmp,
+                    "PATH" to "/system/bin:/system/xbin",
+                    "DROIDFORGE_MARKER" to marker
                 )
             )
-            val stdout = process["stdout"] as? String ?: ""
-            val exitCode = process["exitCode"] as? Int ?: -1
+            val durationMs = (System.nanoTime() - startedAt) / 1_000_000
+            val stdout = (process["stdout"] as? String).orEmpty().trimEnd()
+            val stderr = (process["stderr"] as? String).orEmpty().trimEnd()
+            val exitCode = (process["exitCode"] as? Number)?.toInt() ?: -1
+            val lines = stdout.lines()
+            val passed = exitCode == 0 &&
+                lines.getOrNull(0) == "stdout-ok" &&
+                lines.getOrNull(1) == home &&
+                lines.getOrNull(2) == marker &&
+                stderr == "stderr-ok"
             record(
                 "processRunner",
-                exitCode == 0 && stdout == "droidforge-process-ok",
-                "exit=$exitCode stdout=$stdout"
+                passed,
+                "exit=$exitCode duration=${durationMs}ms cwd=${lines.getOrNull(1).orEmpty()} env=${lines.getOrNull(2).orEmpty()} stdout=${lines.getOrNull(0).orEmpty()} stderr=$stderr"
             )
         } catch (error: Throwable) {
             record("processRunner", false, safeMessage(error))
@@ -485,6 +501,11 @@ class MainActivity : FlutterActivity() {
             "processRunner"
         )
         val ready = required.all { checks[it] == true }
+        logs += if (ready) {
+            "ACCEPTED: V12 execution environment foundation is ready for JDK 17 integration."
+        } else {
+            "REJECTED: Foundation must be fixed before JDK 17 integration."
+        }
         return mapOf(
             "ready" to ready,
             "checks" to checks,
