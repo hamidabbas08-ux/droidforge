@@ -5,6 +5,12 @@ plugins {
 }
 
 android {
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     namespace = "com.hamid.droidforge"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
