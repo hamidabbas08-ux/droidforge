@@ -223,43 +223,114 @@ class MainActivity : FlutterActivity() {
     private fun prepareEmbeddedJdk(): String {
         val javaHome = File(filesDir, "DroidForge/runtime/jdk/jdk17-embedded")
         val marker = File(javaHome, ".foundation-ready")
-        val expectedFoundationVersion = "v11.7"
+        val expectedFoundationVersion = "v11.8"
         val installedFoundationVersion = marker.takeIf { it.isFile }?.readText()?.trim()
-        if (installedFoundationVersion != expectedFoundationVersion) {
-            if (javaHome.exists()) javaHome.deleteRecursively()
+
+        if (installedFoundationVersion != expectedFoundationVersion || !embeddedJdkImageIsComplete(javaHome)) {
+            if (javaHome.exists() && !javaHome.deleteRecursively()) {
+                error("Could not remove previous embedded JDK")
+            }
             if (!javaHome.mkdirs() && !javaHome.isDirectory) {
                 error("Could not create embedded JDK directory")
             }
-            copyAssetTree("jdk17", javaHome)
+
+            copyEmbeddedJdkFromManifest(javaHome)
+            installNativeRuntimeLibraries(javaHome)
+
+            if (!embeddedJdkImageIsComplete(javaHome)) {
+                marker.delete()
+                error("Embedded JDK extraction verification failed")
+            }
             marker.writeText(expectedFoundationVersion)
+        } else {
+            installNativeRuntimeLibraries(javaHome)
         }
 
+        File(javaHome, "tmp").mkdirs()
+        return javaHome.absolutePath
+    }
+
+    private fun copyEmbeddedJdkFromManifest(javaHome: File) {
+        val entries = assets.open("jdk17/asset-files.txt", android.content.res.AssetManager.ACCESS_STREAMING)
+            .bufferedReader()
+            .useLines { lines ->
+                lines.map { it.trim() }
+                    .filter { it.isNotEmpty() && it != "asset-files.txt" }
+                    .toList()
+            }
+
+        if (entries.isEmpty()) error("Embedded JDK asset manifest is empty")
+
+        entries.forEach { relativePath ->
+            val destination = File(javaHome, relativePath)
+            destination.parentFile?.mkdirs()
+            val temporary = File(destination.parentFile, destination.name + ".part")
+            if (temporary.exists()) temporary.delete()
+
+            assets.open("jdk17/$relativePath", android.content.res.AssetManager.ACCESS_STREAMING).use { input ->
+                FileOutputStream(temporary).use { output ->
+                    input.copyTo(output, 1024 * 1024)
+                    output.fd.sync()
+                }
+            }
+
+            if (destination.exists()) destination.delete()
+            if (!temporary.renameTo(destination)) {
+                temporary.copyTo(destination, overwrite = true)
+                temporary.delete()
+            }
+        }
+    }
+
+    private fun installNativeRuntimeLibraries(javaHome: File) {
         val libDir = File(javaHome, "lib").apply { mkdirs() }
         val serverDir = File(libDir, "server").apply { mkdirs() }
         val nativeNames = assets.open("jdk17/native-libs.txt").bufferedReader().useLines { it.toList() }
+
         nativeNames.filter { it.isNotBlank() }.forEach { name ->
             val source = File(applicationInfo.nativeLibraryDir, name)
             val destination = if (name == "libjvm.so") File(serverDir, name) else File(libDir, name)
-            if (!source.exists()) error("APK native library missing: $name")
-            if (destination.exists() || destination.isSymbolicLink()) destination.delete()
+            if (!source.isFile) error("APK native library missing: $name")
+            val temporary = File(destination.parentFile, destination.name + ".part")
             source.inputStream().use { input ->
-                FileOutputStream(destination).use { output ->
+                FileOutputStream(temporary).use { output ->
                     input.copyTo(output, 1024 * 1024)
+                    output.fd.sync()
                 }
+            }
+            if (destination.exists()) destination.delete()
+            if (!temporary.renameTo(destination)) {
+                temporary.copyTo(destination, overwrite = true)
+                temporary.delete()
             }
             destination.setReadable(true, false)
             destination.setExecutable(true, false)
         }
+    }
+
+    private fun embeddedJdkImageIsComplete(javaHome: File): Boolean {
         val modules = File(javaHome, "lib/modules")
-        val security = File(javaHome, "conf/security/java.security")
-        val jvm = File(javaHome, "lib/server/libjvm.so")
-        if (!modules.isFile || modules.length() < 50L * 1024L * 1024L) {
-            error("Embedded JDK modules image is missing or incomplete")
+        val sourceModulesSize = try {
+            assets.open("jdk17/lib/modules", android.content.res.AssetManager.ACCESS_STREAMING).use { input ->
+                var total = 0L
+                val buffer = ByteArray(1024 * 1024)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    total += count
+                }
+                total
+            }
+        } catch (_: Throwable) {
+            128_712_865L
         }
-        if (!security.isFile) error("Embedded JDK security configuration is missing")
-        if (!jvm.isFile) error("Embedded JVM library is missing")
-        File(javaHome, "tmp").mkdirs()
-        return javaHome.absolutePath
+
+        return modules.isFile &&
+            modules.length() == sourceModulesSize &&
+            modules.length() > 100L * 1024L * 1024L &&
+            File(javaHome, "release").isFile &&
+            File(javaHome, "conf/security/java.security").isFile &&
+            File(javaHome, "lib/server/libjvm.so").isFile
     }
 
     private fun File.isSymbolicLink(): Boolean = try {
