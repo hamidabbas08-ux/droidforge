@@ -7,17 +7,20 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
     companion object {
         init {
+            System.loadLibrary("jvm")
             System.loadLibrary("droidforge_runtime")
         }
     }
 
     private external fun nativeHealthCheck(): String
     private external fun nativeLaunchJava(javaHome: String, nativeLibraryDir: String): HashMap<String, Any>
+    private external fun nativeStartEmbeddedJvm(javaHome: String, nativeLibraryDir: String): HashMap<String, Any>
     private val executor = Executors.newCachedThreadPool()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -52,6 +55,33 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         } catch (error: Throwable) {
                             result.error("CHMOD_FAILED", safeMessage(error), null)
+                        }
+                    }
+                }
+                "prepareEmbeddedJdk" -> executor.execute {
+                    try {
+                        val javaHome = prepareEmbeddedJdk()
+                        runOnUiThread { result.success(javaHome) }
+                    } catch (error: Throwable) {
+                        runOnUiThread {
+                            result.error("EMBEDDED_JDK_PREPARE_FAILED", safeMessage(error), error.javaClass.name)
+                        }
+                    }
+                }
+                "startEmbeddedJvm" -> {
+                    val javaHome = call.argument<String>("javaHome")
+                    if (javaHome.isNullOrBlank()) {
+                        result.error("BAD_ARGUMENT", "Missing JAVA_HOME", null)
+                        return@setMethodCallHandler
+                    }
+                    executor.execute {
+                        try {
+                            val vmResult = nativeStartEmbeddedJvm(javaHome, applicationInfo.nativeLibraryDir)
+                            runOnUiThread { result.success(vmResult) }
+                        } catch (error: Throwable) {
+                            runOnUiThread {
+                                result.error("EMBEDDED_JVM_FAILED", safeMessage(error), error.javaClass.name)
+                            }
                         }
                     }
                 }
@@ -132,6 +162,57 @@ class MainActivity : FlutterActivity() {
             }
         }
         return layout.mapValues { it.value.absolutePath }
+    }
+
+    private fun prepareEmbeddedJdk(): String {
+        val javaHome = File(filesDir, "DroidForge/runtime/jdk/jdk17-embedded")
+        val marker = File(javaHome, ".foundation-ready")
+        if (!marker.exists()) {
+            if (javaHome.exists()) javaHome.deleteRecursively()
+            javaHome.mkdirs()
+            copyAssetTree("jdk17", javaHome)
+            marker.writeText("v11.5")
+        }
+
+        val libDir = File(javaHome, "lib").apply { mkdirs() }
+        val serverDir = File(libDir, "server").apply { mkdirs() }
+        val nativeNames = assets.open("jdk17/native-libs.txt").bufferedReader().useLines { it.toList() }
+        nativeNames.filter { it.isNotBlank() }.forEach { name ->
+            val source = File(applicationInfo.nativeLibraryDir, name)
+            val destination = if (name == "libjvm.so") File(serverDir, name) else File(libDir, name)
+            if (!source.exists()) error("APK native library missing: $name")
+            if (destination.exists() || destination.isSymbolicLink()) destination.delete()
+            try {
+                Os.symlink(source.absolutePath, destination.absolutePath)
+            } catch (_: Throwable) {
+                source.inputStream().use { input ->
+                    FileOutputStream(destination).use { output -> input.copyTo(output) }
+                }
+            }
+        }
+        return javaHome.absolutePath
+    }
+
+    private fun File.isSymbolicLink(): Boolean = try {
+        Os.readlink(absolutePath)
+        true
+    } catch (_: Throwable) {
+        false
+    }
+
+    private fun copyAssetTree(assetPath: String, destination: File) {
+        val children = assets.list(assetPath) ?: emptyArray()
+        if (children.isEmpty()) {
+            destination.parentFile?.mkdirs()
+            assets.open(assetPath).use { input ->
+                FileOutputStream(destination).use { output -> input.copyTo(output, 1024 * 1024) }
+            }
+            return
+        }
+        destination.mkdirs()
+        children.forEach { child ->
+            copyAssetTree("$assetPath/$child", File(destination, child))
+        }
     }
 
     private fun runFoundationHealthCheck(): Map<String, Any> {

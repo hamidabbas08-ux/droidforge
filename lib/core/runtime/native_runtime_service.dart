@@ -127,6 +127,31 @@ class NativeRuntimeService {
     await _channel.invokeMethod<void>('chmodExecutable', {'path': path});
   }
 
+  static Future<String> prepareEmbeddedJdk() async {
+    final path = await _channel.invokeMethod<String>('prepareEmbeddedJdk');
+    if (path == null || path.isEmpty) {
+      throw StateError('Embedded JDK preparation returned no JAVA_HOME.');
+    }
+    return path;
+  }
+
+  static Future<NativeProcessResult> startEmbeddedJvm({
+    required String javaHome,
+  }) async {
+    final raw = await _channel.invokeMapMethod<String, dynamic>(
+      'startEmbeddedJvm',
+      {'javaHome': javaHome},
+    );
+    if (raw == null) {
+      throw StateError('Embedded JVM returned no result.');
+    }
+    return NativeProcessResult(
+      exitCode: raw['exitCode'] as int? ?? -1,
+      stdout: raw['stdout'] as String? ?? '',
+      stderr: raw['stderr'] as String? ?? '',
+    );
+  }
+
   static Future<NativeProcessResult> launchJava({
     required String javaHome,
   }) async {

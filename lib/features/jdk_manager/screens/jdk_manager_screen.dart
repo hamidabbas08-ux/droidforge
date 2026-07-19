@@ -95,7 +95,7 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Select the JDK DroidForge should use for Gradle builds.',
+            'Test the APK-bundled Android ARM64 JVM foundation. Gradle execution is a later milestone.',
             style: TextStyle(fontSize: 15),
           ),
           const SizedBox(height: 16),
@@ -116,7 +116,7 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
                       )
                     : Text(
                         installed.contains(version.major)
-                            ? (active?.major == version.major ? 'Active JDK for Gradle' : 'Installed')
+                            ? (active?.major == version.major ? 'Embedded JVM foundation ready' : 'Installed')
                             : version.availabilityLabel,
                       ),
                 trailing: active?.major == version.major

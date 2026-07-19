@@ -3,14 +3,11 @@ import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
 
-import '../../../core/runtime_archive_installer.dart';
 import '../../../core/runtime/native_runtime_service.dart';
 import '../models/jdk_version.dart';
 
 class JdkService {
   static const _activeFileName = 'active-jdk.json';
-  static const _jdk17Url =
-      'https://github.com/itsaky/openjdk-17-android/releases/download/01-01-2022/jdk17-arm64.tar.xz';
 
   static Future<Directory> _root() async {
     final base = await getApplicationSupportDirectory();
@@ -22,11 +19,6 @@ class JdkService {
   static Future<File> _activeFile() async {
     final root = await _root();
     return File('${root.parent.path}/$_activeFileName');
-  }
-
-  static Future<Directory> installDirectory(JdkVersion version) async {
-    final root = await _root();
-    return Directory('${root.path}/${version.id}');
   }
 
   static Future<JdkVersion?> activeVersion() async {
@@ -43,24 +35,25 @@ class JdkService {
 
   static Future<String?> activeJavaHome() async {
     final version = await activeVersion();
-    if (version == null) return null;
-    final dir = await installDirectory(version);
-    final home = await _findJavaHome(dir);
-    if (home == null || !await _verifyJava(home)) return null;
-    return home.path;
+    if (version?.major != 17) return null;
+    try {
+      return await NativeRuntimeService.prepareEmbeddedJdk();
+    } catch (_) {
+      return null;
+    }
   }
 
   static Future<bool> isInstalled(JdkVersion version) async {
-    final dir = await installDirectory(version);
-    final home = await _findJavaHome(dir);
-    return home != null && await _verifyJava(home);
+    if (version.major != 17 || !version.available) return false;
+    final active = await activeVersion();
+    return active?.major == 17;
   }
 
   static Future<void> select(JdkVersion version) async {
-    if (!await isInstalled(version)) {
-      throw Exception('${version.label} is not installed or cannot run on Android.');
+    if (version.major != 17 || !await isInstalled(version)) {
+      throw Exception('${version.label} embedded JVM foundation is not ready.');
     }
-    await (await _activeFile()).writeAsString(jsonEncode({'major': version.major}));
+    await (await _activeFile()).writeAsString(jsonEncode({'major': 17}));
   }
 
   static Future<void> install(
@@ -71,72 +64,24 @@ class JdkService {
       throw UnsupportedError('DroidForge supports Android only.');
     }
     await NativeRuntimeService.requireHealthyFoundation();
-    if (!version.available) {
-      throw UnsupportedError('${version.label} is Coming Soon.');
-    }
-    if (version.major != 17) {
+    if (!version.available || version.major != 17) {
       throw UnsupportedError('${version.label} is Coming Soon.');
     }
 
-    final installDir = await installDirectory(version);
-    if (await installDir.exists()) await installDir.delete(recursive: true);
-    await installDir.create(recursive: true);
+    onProgress?.call(0.10, 'Preparing APK-bundled JDK 17 runtime...');
+    final javaHome = await NativeRuntimeService.prepareEmbeddedJdk();
 
-    final cache = Directory('${installDir.parent.path}/downloads');
-    final archive = File('${cache.path}/jdk17-arm64.tar.xz');
-    await RuntimeArchiveInstaller.download(
-      uri: Uri.parse(_jdk17Url),
-      destination: archive,
-      onProgress: (p, s) => onProgress?.call(p * 0.65, s),
+    onProgress?.call(0.75, 'Starting JVM inside DroidForge process...');
+    final result = await NativeRuntimeService.startEmbeddedJvm(
+      javaHome: javaHome,
     );
-    await RuntimeArchiveInstaller.extractTarXz(
-      archiveFile: archive,
-      destination: installDir,
-      onProgress: (p, s) => onProgress?.call(0.65 + p * 0.25, s),
-    );
-    await RuntimeArchiveInstaller.makeExecutableTree(installDir);
+    if (!result.success || !result.stdout.contains('embedded-jvm-ok')) {
+      final detail = result.stderr.isNotEmpty ? result.stderr : result.stdout;
+      throw Exception('In-process JDK 17 test failed: $detail');
+    }
 
-    final home = await _findJavaHome(installDir);
-    if (home == null) {
-      throw Exception('JDK archive extracted, but bin/java was not found.');
-    }
-    onProgress?.call(0.93, 'Verifying Java runtime...');
-    if (!await _verifyJava(home)) {
-      throw Exception(
-        'Android JDK 17 was extracted, but the APK-packaged JLI launcher could not start it. '
-        'This device may block executables from app storage.',
-      );
-    }
     await (await _activeFile()).writeAsString(jsonEncode({'major': 17}));
-    onProgress?.call(1, 'JDK 17 installed and selected');
-  }
-
-  static Future<bool> _verifyJava(Directory javaHome) async {
-    final java = File('${javaHome.path}/bin/java');
-    if (!await java.exists()) return false;
-    try {
-      final info = await NativeRuntimeService.runtimeInfo();
-      if (!info.isArm64) return false;
-      final result = await NativeRuntimeService.launchJava(
-        javaHome: javaHome.path,
-      );
-      return result.success &&
-          (result.stderr.contains('version') || result.stdout.contains('version'));
-    } catch (_) {
-      return false;
-    }
-  }
-
-  static Future<Directory?> _findJavaHome(Directory root) async {
-    if (!await root.exists()) return null;
-    final direct = File('${root.path}/bin/java');
-    if (await direct.exists()) return root;
-    await for (final entity in root.list(recursive: true, followLinks: false)) {
-      if (entity is File && entity.path.endsWith('/bin/java')) {
-        return Directory(entity.path.substring(0, entity.path.length - 9));
-      }
-    }
-    return null;
+    onProgress?.call(1, result.stdout);
   }
 }
 

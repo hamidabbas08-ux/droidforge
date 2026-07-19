@@ -153,3 +153,139 @@ Java_com_hamid_droidforge_MainActivity_nativeLaunchJava(
   env->DeleteLocalRef(mapClass);
   return map;
 }
+
+using CreateJavaVm = jint (*)(JavaVM**, void**, void*);
+static JavaVM* g_embedded_vm = nullptr;
+
+static std::string jstringToUtf8(JNIEnv* env, jstring value) {
+  if (value == nullptr) return "";
+  const char* chars = env->GetStringUTFChars(value, nullptr);
+  std::string result(chars ? chars : "");
+  if (chars) env->ReleaseStringUTFChars(value, chars);
+  return result;
+}
+
+static std::string describeAndClearJavaException(JNIEnv* env) {
+  if (!env->ExceptionCheck()) return "";
+  jthrowable throwable = env->ExceptionOccurred();
+  env->ExceptionClear();
+  std::string message = "Embedded JVM raised an exception";
+  jclass throwableClass = env->FindClass("java/lang/Throwable");
+  if (throwableClass != nullptr) {
+    jmethodID toString = env->GetMethodID(throwableClass, "toString", "()Ljava/lang/String;");
+    if (toString != nullptr && throwable != nullptr) {
+      auto text = static_cast<jstring>(env->CallObjectMethod(throwable, toString));
+      if (!env->ExceptionCheck() && text != nullptr) message = jstringToUtf8(env, text);
+      if (env->ExceptionCheck()) env->ExceptionClear();
+      if (text != nullptr) env->DeleteLocalRef(text);
+    }
+    env->DeleteLocalRef(throwableClass);
+  }
+  if (throwable != nullptr) env->DeleteLocalRef(throwable);
+  return message;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_hamid_droidforge_MainActivity_nativeStartEmbeddedJvm(
+    JNIEnv* artEnv,
+    jobject /* thiz */,
+    jstring javaHomeValue,
+    jstring nativeLibraryDirValue) {
+  const std::string javaHome = jstringToUtf8(artEnv, javaHomeValue);
+  const std::string nativeLibraryDir = jstringToUtf8(artEnv, nativeLibraryDirValue);
+
+  int exitCode = 1;
+  std::string stdoutText;
+  std::string stderrText;
+
+  if (javaHome.empty() || nativeLibraryDir.empty()) {
+    stderrText = "JAVA_HOME or nativeLibraryDir is empty";
+  } else {
+    JNIEnv* jvmEnv = nullptr;
+    if (g_embedded_vm != nullptr) {
+      const jint attach = g_embedded_vm->AttachCurrentThread(&jvmEnv, nullptr);
+      if (attach != JNI_OK) {
+        stderrText = "Existing embedded JVM could not attach current thread: " + std::to_string(attach);
+      }
+    } else {
+      const std::string jvmPath = nativeLibraryDir + "/libjvm.so";
+      void* handle = dlopen(jvmPath.c_str(), RTLD_NOW | RTLD_GLOBAL);
+      if (handle == nullptr) {
+        stderrText = std::string("dlopen libjvm failed: ") + dlerror();
+      } else {
+        auto createVm = reinterpret_cast<CreateJavaVm>(dlsym(handle, "JNI_CreateJavaVM"));
+        if (createVm == nullptr) {
+          stderrText = std::string("JNI_CreateJavaVM not found: ") + dlerror();
+        } else {
+          std::vector<std::string> optionStorage = {
+              "-Djava.home=" + javaHome,
+              "-Djava.library.path=" + nativeLibraryDir,
+              "-Djava.io.tmpdir=" + javaHome + "/tmp",
+              "-Duser.home=" + javaHome,
+              "-Dfile.encoding=UTF-8",
+              "-XX:-UsePerfData",
+              "-Xrs",
+              "-Xms16m",
+              "-Xmx256m",
+          };
+          std::vector<JavaVMOption> options(optionStorage.size());
+          for (size_t i = 0; i < optionStorage.size(); ++i) {
+            options[i].optionString = optionStorage[i].data();
+            options[i].extraInfo = nullptr;
+          }
+          JavaVMInitArgs args{};
+          args.version = JNI_VERSION_1_8;
+          args.nOptions = static_cast<jint>(options.size());
+          args.options = options.data();
+          args.ignoreUnrecognized = JNI_FALSE;
+          const jint created = createVm(&g_embedded_vm, reinterpret_cast<void**>(&jvmEnv), &args);
+          if (created != JNI_OK || g_embedded_vm == nullptr || jvmEnv == nullptr) {
+            stderrText = "JNI_CreateJavaVM failed with code " + std::to_string(created);
+            g_embedded_vm = nullptr;
+          }
+        }
+      }
+    }
+
+    if (jvmEnv != nullptr && stderrText.empty()) {
+      jclass systemClass = jvmEnv->FindClass("java/lang/System");
+      if (systemClass == nullptr) {
+        stderrText = describeAndClearJavaException(jvmEnv);
+        if (stderrText.empty()) stderrText = "java/lang/System was not found";
+      } else {
+        jmethodID getProperty = jvmEnv->GetStaticMethodID(
+            systemClass,
+            "getProperty",
+            "(Ljava/lang/String;)Ljava/lang/String;");
+        if (getProperty == nullptr) {
+          stderrText = describeAndClearJavaException(jvmEnv);
+          if (stderrText.empty()) stderrText = "System.getProperty was not found";
+        } else {
+          jstring key = jvmEnv->NewStringUTF("java.version");
+          auto value = static_cast<jstring>(jvmEnv->CallStaticObjectMethod(systemClass, getProperty, key));
+          if (jvmEnv->ExceptionCheck()) {
+            stderrText = describeAndClearJavaException(jvmEnv);
+          } else {
+            const std::string version = jstringToUtf8(jvmEnv, value);
+            stdoutText = "embedded-jvm-ok|java.version=" + version;
+            exitCode = version.empty() ? 2 : 0;
+          }
+          if (key != nullptr) jvmEnv->DeleteLocalRef(key);
+          if (value != nullptr) jvmEnv->DeleteLocalRef(value);
+        }
+        jvmEnv->DeleteLocalRef(systemClass);
+      }
+    }
+  }
+
+  jclass mapClass = artEnv->FindClass("java/util/HashMap");
+  jmethodID ctor = artEnv->GetMethodID(mapClass, "<init>", "()V");
+  jmethodID put = artEnv->GetMethodID(
+      mapClass, "put", "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;");
+  jobject map = artEnv->NewObject(mapClass, ctor);
+  putInt(artEnv, map, put, "exitCode", exitCode);
+  putString(artEnv, map, put, "stdout", stdoutText);
+  putString(artEnv, map, put, "stderr", stderrText);
+  artEnv->DeleteLocalRef(mapClass);
+  return map;
+}
