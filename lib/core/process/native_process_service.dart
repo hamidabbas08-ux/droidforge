@@ -9,6 +9,18 @@ class NativeProcessService {
     'com.hamid.droidforge/process',
   );
 
+  Future<ProcessExecutionResult> runBundledNativeTest() async {
+    final rawResult = await _channel.invokeMethod<Object?>(
+      'runBundledNativeTest',
+    );
+
+    if (rawResult is! Map) {
+      throw StateError('Bundled native test returned an invalid response.');
+    }
+
+    return ProcessExecutionResult.fromMap(rawResult);
+  }
+
   Future<ProcessExecutionResult> run({
     required String executable,
     List<String> arguments = const <String>[],

@@ -28,6 +28,50 @@ class MainActivity : FlutterActivity() {
             PROCESS_CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "runBundledNativeTest" -> {
+                    processExecutor.execute {
+                        try {
+                            val executable = java.io.File(
+                                applicationInfo.nativeLibraryDir,
+                                "libdroidforge_exec.so"
+                            )
+
+                            if (!executable.exists()) {
+                                throw java.io.FileNotFoundException(
+                                    "Bundled native executable not found: ${executable.absolutePath}"
+                                )
+                            }
+
+                            val response = runProcess(
+                                executable = executable.absolutePath,
+                                arguments = listOf(
+                                    "DroidForge",
+                                    "ARM64",
+                                    "Native-Test"
+                                ),
+                                workingDirectory = executable.parent,
+                                environment = mapOf(
+                                    "JAVA_HOME" to filesDir.absolutePath,
+                                    "TMPDIR" to cacheDir.absolutePath
+                                ),
+                                timeoutSeconds = 30
+                            )
+
+                            mainHandler.post {
+                                result.success(response)
+                            }
+                        } catch (error: Throwable) {
+                            mainHandler.post {
+                                result.error(
+                                    "NATIVE_TEST_FAILED",
+                                    error.message ?: error.javaClass.simpleName,
+                                    error.stackTraceToString()
+                                )
+                            }
+                        }
+                    }
+                }
+
                 "runProcess" -> {
                     val executable = call.argument<String>("executable")
                     val arguments =

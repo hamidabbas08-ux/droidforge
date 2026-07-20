@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/process/native_process_service.dart';
+
 import '../controllers/jdk_manager_controller.dart';
 import '../models/jdk_installation.dart';
 
@@ -23,6 +25,50 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
   void dispose() {
     controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _runNativeTest() async {
+    try {
+      final result = await const NativeProcessService().runBundledNativeTest();
+
+      if (!mounted) return;
+
+      final output = result.combinedOutput.isEmpty
+          ? 'Exit code: ${result.exitCode}'
+          : result.combinedOutput;
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            result.succeeded ? 'Native Test Passed' : 'Native Test Failed',
+          ),
+          content: SelectableText(output),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Native Test Error'),
+          content: SelectableText(error.toString()),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Future<void> _install(JdkInstallation installation) async {
@@ -117,7 +163,16 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('JDK Manager')),
+      appBar: AppBar(
+        title: const Text('JDK Manager'),
+        actions: [
+          IconButton(
+            tooltip: 'Run native test',
+            onPressed: _runNativeTest,
+            icon: const Icon(Icons.science_outlined),
+          ),
+        ],
+      ),
       body: AnimatedBuilder(
         animation: controller,
         builder: (context, _) {
