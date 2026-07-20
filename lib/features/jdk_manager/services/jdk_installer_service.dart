@@ -5,16 +5,27 @@ import 'dart:isolate';
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
 
+import '../../../core/process/native_process_service.dart';
 import '../models/jdk_release.dart';
+import 'jdk_runtime_verifier.dart';
 import 'jdk_storage_service.dart';
 
 typedef JdkInstallProgress = void Function(String stage, double progress);
 
 class JdkInstallerService {
-  JdkInstallerService({JdkStorageService? storage})
-    : _storage = storage ?? JdkStorageService();
+  JdkInstallerService({
+    JdkStorageService? storage,
+    NativeProcessService processService = const NativeProcessService(),
+    JdkRuntimeVerifier? runtimeVerifier,
+  }) : _storage = storage ?? JdkStorageService(),
+       _processService = processService,
+       _runtimeVerifier =
+           runtimeVerifier ??
+           JdkRuntimeVerifier(processService: processService);
 
   final JdkStorageService _storage;
+  final NativeProcessService _processService;
+  final JdkRuntimeVerifier _runtimeVerifier;
 
   Future<String> install(
     JdkRelease release, {
@@ -68,6 +79,9 @@ class JdkInstallerService {
       await workDirectory.rename(finalDirectory.path);
 
       await _makeExecutablesRunnable(finalDirectory);
+
+      onProgress('Testing JDK runtime', 0.99);
+      await _runtimeVerifier.verify(finalDirectory.path);
 
       await _deleteFileIfExists(archiveFile);
 
@@ -239,14 +253,16 @@ class JdkInstallerService {
         continue;
       }
 
-      final result = await Process.run('chmod', <String>['700', entity.path]);
+      final result = await _processService.run(
+        executable: '/system/bin/chmod',
+        arguments: <String>['700', entity.path],
+        timeout: const Duration(seconds: 30),
+      );
 
-      if (result.exitCode != 0) {
-        throw ProcessException(
-          'chmod',
-          <String>['700', entity.path],
-          result.stderr.toString(),
-          result.exitCode,
+      if (!result.succeeded) {
+        throw StateError(
+          'Failed to make executable: ${entity.path}. '
+          '${result.combinedOutput}',
         );
       }
     }

@@ -1,0 +1,10 @@
+{
+  "version": 17,
+  "architecture": "arm64-v8a",
+  "assetName": "jdk17-arm64.tar.xz",
+  "downloadUrl": "https://github.com/itsaky/openjdk-17-android/releases/download/01-01-2022/jdk17-arm64.tar.xz",
+  "sizeBytes": 157457188,
+  "digest": null,
+  "releaseTag": "01-01-2022",
+  "sourceRepository": "itsaky/openjdk-17-android"
+}
