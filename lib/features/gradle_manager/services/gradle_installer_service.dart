@@ -32,7 +32,7 @@ class GradleInstallerService {
       '${root.path}/.install-gradle-${release.version}',
     );
 
-    final archiveFile = File('${root.path}/.${release.assetName}.part');
+    final archiveFile = File('${root.path}/.part-${release.assetName}');
 
     await _deleteDirectoryIfExists(workDirectory);
     await _deleteFileIfExists(archiveFile);
