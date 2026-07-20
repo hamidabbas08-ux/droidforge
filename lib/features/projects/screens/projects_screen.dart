@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../android_sdk_manager/screens/android_sdk_manager_screen.dart';
 import '../../gradle_manager/screens/gradle_manager_screen.dart';
 import '../../jdk_manager/screens/jdk_manager_screen.dart';
 import 'new_project_screen.dart';
@@ -57,6 +58,22 @@ class ProjectsScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const GradleManagerScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.android),
+              title: const Text('Android SDK Manager'),
+              subtitle: const Text('Install and manage Android SDK'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const AndroidSdkManagerScreen(),
                   ),
                 );
               },
