@@ -478,9 +478,13 @@ class MainActivity : FlutterActivity() {
             val stderr = (process["stderr"] as? String).orEmpty().trimEnd()
             val exitCode = (process["exitCode"] as? Number)?.toInt() ?: -1
             val lines = stdout.lines()
+            val reportedCwd = lines.getOrNull(1).orEmpty()
+            val expectedCanonicalHome = java.io.File(home).canonicalPath
+            val reportedCanonicalCwd = java.io.File(reportedCwd).canonicalPath
+
             val passed = exitCode == 0 &&
                 lines.getOrNull(0) == "stdout-ok" &&
-                lines.getOrNull(1) == home &&
+                reportedCanonicalCwd == expectedCanonicalHome &&
                 lines.getOrNull(2) == marker &&
                 stderr == "stderr-ok"
             record(
