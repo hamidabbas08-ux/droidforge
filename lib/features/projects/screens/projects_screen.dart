@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../gradle_manager/screens/gradle_manager_screen.dart';
 import '../../jdk_manager/screens/jdk_manager_screen.dart';
 import 'new_project_screen.dart';
 
@@ -40,6 +41,22 @@ class ProjectsScreen extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => const JdkManagerScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.build_circle_outlined),
+              title: const Text('Gradle Manager'),
+              subtitle: const Text('Install and select Gradle'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GradleManagerScreen(),
                   ),
                 );
               },
