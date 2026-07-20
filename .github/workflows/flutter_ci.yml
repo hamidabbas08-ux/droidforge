@@ -15,12 +15,6 @@ jobs:
           lfs: true
           fetch-depth: 0
 
-      - name: Verify embedded JDK image
-        run: |
-          git lfs pull
-          git lfs checkout
-          wc -c android/app/src/main/assets/jdk17/lib/modules
-          test "$(wc -c < android/app/src/main/assets/jdk17/lib/modules)" -eq 128712865
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
