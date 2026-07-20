@@ -51,9 +51,10 @@ class JdkRuntimeVerifier {
       'HOME': jdkPath,
       'PATH': '$jdkPath/bin:/system/bin:/system/xbin',
       'TMPDIR': Directory.systemTemp.path,
+      'LD_LIBRARY_PATH': '$jdkPath/lib:$jdkPath/lib/server',
     };
 
-    final javaResult = await _processService.run(
+    final javaResult = await _processService.runAndroidElf(
       executable: javaFile.path,
       arguments: const <String>['-version'],
       workingDirectory: jdkPath,
@@ -65,7 +66,7 @@ class JdkRuntimeVerifier {
       throw StateError(_failureMessage('java -version', javaResult));
     }
 
-    final javacResult = await _processService.run(
+    final javacResult = await _processService.runAndroidElf(
       executable: javacFile.path,
       arguments: const <String>['-version'],
       workingDirectory: jdkPath,
@@ -87,7 +88,7 @@ class JdkRuntimeVerifier {
     final result = await _processService.run(
       executable: '/system/bin/chmod',
       arguments: <String>['700', file.path],
-      timeout: const Duration(seconds: 30),
+      timeout: const Duration(seconds: 10),
     );
 
     if (!result.succeeded) {

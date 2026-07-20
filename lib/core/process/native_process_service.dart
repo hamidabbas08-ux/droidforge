@@ -21,6 +21,30 @@ class NativeProcessService {
     return ProcessExecutionResult.fromMap(rawResult);
   }
 
+  Future<ProcessExecutionResult> runAndroidElf({
+    required String executable,
+    List<String> arguments = const <String>[],
+    String? workingDirectory,
+    Map<String, String> environment = const <String, String>{},
+    Duration timeout = const Duration(seconds: 30),
+  }) {
+    if (executable.trim().isEmpty) {
+      throw ArgumentError.value(
+        executable,
+        'executable',
+        'Executable path cannot be empty.',
+      );
+    }
+
+    return run(
+      executable: '/system/bin/linker64',
+      arguments: <String>[executable, ...arguments],
+      workingDirectory: workingDirectory,
+      environment: environment,
+      timeout: timeout,
+    );
+  }
+
   Future<ProcessExecutionResult> run({
     required String executable,
     List<String> arguments = const <String>[],
