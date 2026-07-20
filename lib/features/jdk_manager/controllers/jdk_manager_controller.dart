@@ -1,17 +1,25 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/jdk_installation.dart';
+import '../models/jdk_release.dart';
+import '../services/jdk_installer_service.dart';
 import '../services/jdk_storage_service.dart';
 
 class JdkManagerController extends ChangeNotifier {
-  JdkManagerController({JdkStorageService? storage})
-    : _storage = storage ?? JdkStorageService();
+  JdkManagerController({
+    JdkStorageService? storage,
+    JdkInstallerService? installer,
+  }) : _storage = storage ?? JdkStorageService(),
+       _installer = installer ?? JdkInstallerService();
 
   final JdkStorageService _storage;
+  final JdkInstallerService _installer;
 
   bool _loading = true;
-
   bool get loading => _loading;
+
+  bool _busy = false;
+  bool get busy => _busy;
 
   List<JdkInstallation> _installations = const [
     JdkInstallation(
@@ -62,6 +70,77 @@ class JdkManagerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> install(int version) async {
+    if (_busy) {
+      return;
+    }
+
+    final release = JdkReleaseCatalog.forVersion(version);
+
+    if (release == null) {
+      throw StateError('JDK $version package is not enabled yet.');
+    }
+
+    _busy = true;
+
+    _update(
+      version,
+      state: JdkInstallState.downloading,
+      progress: 0,
+      clearError: true,
+    );
+
+    try {
+      final path = await _installer.install(
+        release,
+        onProgress: (stage, progress) {
+          final state = switch (stage) {
+            'Downloading' => JdkInstallState.downloading,
+            'Verifying size' ||
+            'Verifying SHA-256' => JdkInstallState.verifying,
+            'Extracting' ||
+            'Validating JDK' ||
+            'Finalizing' => JdkInstallState.extracting,
+            _ => JdkInstallState.downloading,
+          };
+
+          _update(version, state: state, progress: progress);
+        },
+      );
+
+      _installations = [
+        for (final item in _installations)
+          if (item.version == version)
+            item.copyWith(
+              state: JdkInstallState.active,
+              progress: 1,
+              installPath: path,
+              clearError: true,
+            )
+          else
+            item.copyWith(
+              state: item.isInstalled
+                  ? JdkInstallState.installed
+                  : JdkInstallState.notInstalled,
+            ),
+      ];
+
+      notifyListeners();
+    } catch (error) {
+      _update(
+        version,
+        state: JdkInstallState.failed,
+        progress: 0,
+        error: error.toString(),
+      );
+
+      rethrow;
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> activate(int version) async {
     final target = _installations.firstWhere((item) => item.version == version);
 
@@ -86,7 +165,34 @@ class JdkManagerController extends ChangeNotifier {
   }
 
   Future<void> remove(int version) async {
+    if (_busy) {
+      return;
+    }
+
     await _storage.removeVersion(version);
     await load();
+  }
+
+  void _update(
+    int version, {
+    required JdkInstallState state,
+    required double progress,
+    String? error,
+    bool clearError = false,
+  }) {
+    _installations = [
+      for (final item in _installations)
+        if (item.version == version)
+          item.copyWith(
+            state: state,
+            progress: progress,
+            error: error,
+            clearError: clearError,
+          )
+        else
+          item,
+    ];
+
+    notifyListeners();
   }
 }

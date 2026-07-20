@@ -25,6 +25,26 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
     super.dispose();
   }
 
+  Future<void> _install(JdkInstallation installation) async {
+    try {
+      await controller.install(installation.version);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${installation.displayName} installed and selected.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   Future<void> _activate(JdkInstallation installation) async {
     try {
       await controller.activate(installation.version);
@@ -159,9 +179,12 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
                           ],
                         )
                       : const Icon(Icons.chevron_right),
-                  onTap: installation.isInstalled
+                  enabled: !controller.busy || installation.progress > 0,
+                  onTap: controller.busy
+                      ? null
+                      : installation.isInstalled
                       ? () => _activate(installation)
-                      : null,
+                      : () => _install(installation),
                 ),
               );
             },

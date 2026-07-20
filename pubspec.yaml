@@ -13,8 +13,9 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   path_provider: ^2.1.6
-  archive: ^4.0.7
+  archive: ^4.0.9
   http: ^1.5.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
