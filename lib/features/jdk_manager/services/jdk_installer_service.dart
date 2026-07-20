@@ -25,7 +25,7 @@ class JdkInstallerService {
       '${root.path}/.install-jdk-${release.version}',
     );
 
-    final archiveFile = File('${root.path}/${release.assetName}.part');
+    final archiveFile = File('${root.path}/.${release.assetName}.part.tar.xz');
 
     await _deleteIfExists(workDirectory);
     await _deleteFileIfExists(archiveFile);
