@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:archive/archive_io.dart';
 import 'package:crypto/crypto.dart';
@@ -50,13 +51,12 @@ class JdkInstallerService {
       onProgress('Extracting', 0.80);
       await workDirectory.create(recursive: true);
 
-      await extractFileToDisk(
-        archiveFile.path,
-        workDirectory.path,
-        callback: (_) {
-          // Extraction is intentionally disk-based.
-        },
-      );
+      final archivePath = archiveFile.path;
+      final extractionPath = workDirectory.path;
+
+      await Isolate.run<void>(() async {
+        await extractFileToDisk(archivePath, extractionPath, callback: (_) {});
+      });
 
       onProgress('Validating JDK', 0.94);
       await _validateInstallation(workDirectory);
@@ -142,14 +142,19 @@ class JdkInstallerService {
   }
 
   Future<void> _verifySha256(JdkRelease release, File archiveFile) async {
-    final digest = await sha256.bind(archiveFile.openRead()).first;
-    final actual = digest.toString().toLowerCase();
+    final archivePath = archiveFile.path;
+
+    final actual = await Isolate.run<String>(() async {
+      final digest = await sha256.bind(File(archivePath).openRead()).first;
+      return digest.toString().toLowerCase();
+    });
+
     final expected = release.sha256.toLowerCase();
 
     if (actual != expected) {
       throw StateError(
-        'JDK archive SHA-256 mismatch. '
-        'Expected $expected, received $actual.',
+        'JDK package verification failed. '
+        'Expected SHA-256: $expected, actual: $actual',
       );
     }
   }
