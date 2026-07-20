@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../jdk_manager/screens/jdk_manager_screen.dart';
 import 'new_project_screen.dart';
 
 class ProjectsScreen extends StatelessWidget {
@@ -21,7 +22,25 @@ class ProjectsScreen extends StatelessWidget {
               onTap: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const NewProjectScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const NewProjectScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.developer_mode),
+              title: const Text('JDK Manager'),
+              subtitle: const Text('Install and select a JDK'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const JdkManagerScreen(),
+                  ),
                 );
               },
             ),
