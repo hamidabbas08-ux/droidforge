@@ -64,9 +64,9 @@ jobs:
 
           printf '%s' "$KEYSTORE_BASE64" \
             | base64 --decode \
-            > android/app/droidforge-ci.jks
+            > android/droidforge-ci.jks
 
-          chmod 600 android/app/droidforge-ci.jks
+          chmod 600 android/droidforge-ci.jks
 
           cat > android/key.properties <<EOF
           storePassword=$STORE_PASSWORD
