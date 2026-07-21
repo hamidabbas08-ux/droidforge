@@ -140,6 +140,8 @@ class ProjectBuildService {
       sdkPath: sdkPath,
     );
 
+    await _writeAndroidGradleProperties(projectDirectory);
+
     final supportDirectory = await getApplicationSupportDirectory();
 
     final gradleUserHome = Directory(
@@ -183,13 +185,17 @@ class ProjectBuildService {
         '-Djava.io.tmpdir=${temporaryDirectory.path}',
         '-Duser.home=${supportDirectory.path}',
         '-Dorg.gradle.daemon=false',
-        '-Dorg.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8',
+        '-Dorg.gradle.native=false',
+        '-Dorg.gradle.vfs.watch=false',
+        '-Dorg.gradle.workers.max=2',
         '-classpath',
         gradleLauncher.path,
         'org.gradle.launcher.GradleMain',
         '--no-daemon',
         '--stacktrace',
         '--console=plain',
+        '--no-watch-fs',
+        '--max-workers=2',
         '--project-dir',
         projectDirectory.path,
         type.gradleTask,
@@ -262,6 +268,54 @@ class ProjectBuildService {
         'Missing: ${missing.join(', ')}',
       );
     }
+  }
+
+  Future<void> _writeAndroidGradleProperties(Directory projectDirectory) async {
+    final file = File('${projectDirectory.path}/gradle.properties');
+
+    final existing = await file.exists()
+        ? await file.readAsLines()
+        : <String>[];
+
+    const managedKeys = <String>{
+      'org.gradle.jvmargs',
+      'org.gradle.daemon',
+      'org.gradle.native',
+      'org.gradle.vfs.watch',
+      'org.gradle.workers.max',
+    };
+
+    final preserved = existing.where((line) {
+      final trimmed = line.trim();
+
+      if (trimmed.isEmpty || trimmed.startsWith('#')) {
+        return true;
+      }
+
+      final separator = trimmed.indexOf('=');
+
+      if (separator < 0) {
+        return true;
+      }
+
+      final key = trimmed.substring(0, separator).trim();
+      return !managedKeys.contains(key);
+    }).toList();
+
+    while (preserved.isNotEmpty && preserved.last.trim().isEmpty) {
+      preserved.removeLast();
+    }
+
+    preserved.addAll(const <String>[
+      '',
+      '# DroidForge Android runtime settings',
+      'org.gradle.daemon=false',
+      'org.gradle.native=false',
+      'org.gradle.vfs.watch=false',
+      'org.gradle.workers.max=2',
+    ]);
+
+    await file.writeAsString('${preserved.join('\n')}\n', flush: true);
   }
 
   Future<void> _writeLocalProperties({

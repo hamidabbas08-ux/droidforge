@@ -130,7 +130,10 @@ include(":app")
 
   static String gradleProperties() {
     return '''
-org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+org.gradle.daemon=false
+org.gradle.native=false
+org.gradle.vfs.watch=false
+org.gradle.workers.max=2
 android.useAndroidX=true
 android.nonTransitiveRClass=true
 kotlin.code.style=official
