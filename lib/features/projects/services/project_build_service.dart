@@ -156,11 +156,22 @@ class ProjectBuildService {
     await temporaryDirectory.create(recursive: true);
 
     final gradleJvmArguments = <String>[
-      '-Xmx512m',
       '-Xint',
+      '--add-opens=java.base/java.util=ALL-UNNAMED',
+      '--add-opens=java.base/java.lang=ALL-UNNAMED',
+      '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED',
+      '--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED',
+      '--add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
+      '--add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+      '--add-opens=java.base/java.nio.charset=ALL-UNNAMED',
+      '--add-opens=java.base/java.net=ALL-UNNAMED',
+      '--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED',
+      '-Xmx512m',
       '-Dfile.encoding=UTF-8',
       '-Djava.io.tmpdir=${temporaryDirectory.path}',
-      '-Duser.home=${supportDirectory.path}',
+      '-Duser.country',
+      '-Duser.language=en',
+      '-Duser.variant',
     ];
 
     await _writeAndroidGradleProperties(
