@@ -181,14 +181,14 @@ class ProjectBuildService {
     final result = await _processService.runAndroidElf(
       executable: javaExecutable.path,
       arguments: <String>[
-        '-Xmx1024m',
+        '-Xmx512m',
         '-Dfile.encoding=UTF-8',
         '-Djava.io.tmpdir=${temporaryDirectory.path}',
         '-Duser.home=${supportDirectory.path}',
         '-Dorg.gradle.daemon=false',
         '-Dorg.gradle.native=false',
         '-Dorg.gradle.vfs.watch=false',
-        '-Dorg.gradle.workers.max=2',
+        '-Dorg.gradle.workers.max=1',
         '-classpath',
         gradleLauncher.path,
         'org.gradle.launcher.GradleMain',
@@ -196,7 +196,7 @@ class ProjectBuildService {
         '--stacktrace',
         '--console=plain',
         '--no-watch-fs',
-        '--max-workers=2',
+        '--max-workers=1',
         '--project-dir',
         projectDirectory.path,
         type.gradleTask,
@@ -542,7 +542,7 @@ class ProjectBuildService {
       'org.gradle.daemon=false',
       'org.gradle.native=false',
       'org.gradle.vfs.watch=false',
-      'org.gradle.workers.max=2',
+      'org.gradle.workers.max=1',
     ]);
 
     await file.writeAsString('${preserved.join('\n')}\n', flush: true);

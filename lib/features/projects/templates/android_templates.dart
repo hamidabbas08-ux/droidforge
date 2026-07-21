@@ -133,7 +133,7 @@ include(":app")
 org.gradle.daemon=false
 org.gradle.native=false
 org.gradle.vfs.watch=false
-org.gradle.workers.max=2
+org.gradle.workers.max=1
 android.useAndroidX=true
 android.nonTransitiveRClass=true
 kotlin.code.style=official
