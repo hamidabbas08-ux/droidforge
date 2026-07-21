@@ -99,11 +99,22 @@ class ProjectBuildService {
     }
 
     final gradleExecutable = File('$gradlePath/bin/gradle');
+    final gradleLauncher = File(
+      '$gradlePath/lib/gradle-launcher-$activeGradleVersion.jar',
+    );
     final javaExecutable = File('$jdkPath/bin/java');
     final javacExecutable = File('$jdkPath/bin/javac');
 
     if (!await gradleExecutable.exists()) {
-      throw StateError('Gradle launcher is missing: ${gradleExecutable.path}');
+      throw StateError(
+        'Gradle launcher script is missing: ${gradleExecutable.path}',
+      );
+    }
+
+    if (!await gradleLauncher.exists()) {
+      throw StateError(
+        'Gradle launcher JAR is missing: ${gradleLauncher.path}',
+      );
     }
 
     if (!await javaExecutable.exists()) {
@@ -114,11 +125,7 @@ class ProjectBuildService {
       throw StateError('Java compiler is missing: ${javacExecutable.path}');
     }
 
-    onProgress('Preparing toolchain permissions', 0.24);
-
-    await _makeExecutable(javaExecutable);
-    await _makeExecutable(javacExecutable);
-    await _makeExecutable(gradleExecutable);
+    onProgress('Preparing Android linker runtime', 0.24);
 
     onProgress('Checking Android SDK', 0.28);
 
@@ -168,13 +175,23 @@ class ProjectBuildService {
       'LD_LIBRARY_PATH': ['$jdkPath/lib', '$jdkPath/lib/server'].join(':'),
     };
 
-    final result = await _processService.run(
-      executable: '/system/bin/sh',
+    final result = await _processService.runAndroidElf(
+      executable: javaExecutable.path,
       arguments: <String>[
-        gradleExecutable.path,
+        '-Xmx1024m',
+        '-Dfile.encoding=UTF-8',
+        '-Djava.io.tmpdir=${temporaryDirectory.path}',
+        '-Duser.home=${supportDirectory.path}',
+        '-Dorg.gradle.daemon=false',
+        '-Dorg.gradle.jvmargs=-Xmx1024m -Dfile.encoding=UTF-8',
+        '-classpath',
+        gradleLauncher.path,
+        'org.gradle.launcher.GradleMain',
         '--no-daemon',
         '--stacktrace',
         '--console=plain',
+        '--project-dir',
+        projectDirectory.path,
         type.gradleTask,
       ],
       workingDirectory: projectDirectory.path,
@@ -261,20 +278,5 @@ class ProjectBuildService {
       'sdk.dir=$escapedSdkPath\n',
       flush: true,
     );
-  }
-
-  Future<void> _makeExecutable(File file) async {
-    final result = await _processService.run(
-      executable: '/system/bin/chmod',
-      arguments: <String>['700', file.path],
-      timeout: const Duration(seconds: 15),
-    );
-
-    if (!result.succeeded) {
-      throw StateError(
-        'Failed to make Gradle executable: ${file.path}. '
-        '${result.combinedOutput}',
-      );
-    }
   }
 }
