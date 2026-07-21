@@ -68,6 +68,29 @@ jobs:
 
           echo "Permanent signing key verified successfully."
 
+      - name: Build Android ARM64 Java launcher shim
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          NDK_HOME="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+
+          if [ -z "$NDK_HOME" ]; then
+            NDK_HOME="$(find "$ANDROID_SDK_ROOT/ndk"               -mindepth 1               -maxdepth 1               -type d               | sort -V               | tail -n 1)"
+          fi
+
+          CLANG="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang"
+
+          test -x "$CLANG"
+
+          mkdir -p android/app/src/main/jniLibs/arm64-v8a
+
+          "$CLANG"             -fPIE             -pie             -O2             -Wall             -Wextra             native/java_shim/droidforge_java_shim.c             -o android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
+
+          file android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
+
+          readelf -h             android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
+
       - name: Get dependencies
         run: flutter pub get
 

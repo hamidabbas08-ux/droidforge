@@ -439,6 +439,27 @@ class ProjectBuildService {
       result: gradleResult,
     );
 
+    onProgress('Testing packaged Java shim', 0.86);
+
+    final javaShimPath = await _processService.getBundledJavaShimPath();
+
+    final javaShimResult = await _processService.run(
+      executable: javaShimPath,
+      arguments: const <String>['-version'],
+      workingDirectory: diagnosticDirectory.path,
+      environment: <String, String>{
+        ...environment,
+        'DROIDFORGE_REAL_JAVA': javaExecutable.path,
+      },
+      timeout: const Duration(seconds: 45),
+    );
+
+    _appendDiagnosticResult(
+      report: report,
+      title: 'TEST 4 — PACKAGED JAVA SHIM',
+      result: javaShimResult,
+    );
+
     onProgress('Diagnostic complete', 1);
 
     report
@@ -446,7 +467,8 @@ class ProjectBuildService {
       ..writeln('================================')
       ..writeln('java -version: ${_diagnosticStatus(javaResult)}')
       ..writeln('javac -version: ${_diagnosticStatus(javacResult)}')
-      ..writeln('Gradle launcher: ${_diagnosticStatus(gradleResult)}');
+      ..writeln('Gradle launcher: ${_diagnosticStatus(gradleResult)}')
+      ..writeln('Packaged Java shim: ${_diagnosticStatus(javaShimResult)}');
 
     return report.toString().trim();
   }

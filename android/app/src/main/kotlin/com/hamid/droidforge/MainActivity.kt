@@ -28,6 +28,23 @@ class MainActivity : FlutterActivity() {
             PROCESS_CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "getBundledJavaShimPath" -> {
+                    val shim = java.io.File(
+                        applicationInfo.nativeLibraryDir,
+                        "libdroidforge_java_shim.so"
+                    )
+
+                    if (!shim.exists()) {
+                        result.error(
+                            "JAVA_SHIM_NOT_FOUND",
+                            "Bundled Java shim not found: ${shim.absolutePath}",
+                            null
+                        )
+                    } else {
+                        result.success(shim.absolutePath)
+                    }
+                }
+
                 "runBundledNativeTest" -> {
                     processExecutor.execute {
                         try {

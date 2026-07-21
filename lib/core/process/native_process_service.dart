@@ -9,6 +9,16 @@ class NativeProcessService {
     'com.hamid.droidforge/process',
   );
 
+  Future<String> getBundledJavaShimPath() async {
+    final path = await _channel.invokeMethod<String>('getBundledJavaShimPath');
+
+    if (path == null || path.trim().isEmpty) {
+      throw StateError('Bundled Java shim path was not returned.');
+    }
+
+    return path;
+  }
+
   Future<ProcessExecutionResult> runBundledNativeTest() async {
     final rawResult = await _channel.invokeMethod<Object?>(
       'runBundledNativeTest',
