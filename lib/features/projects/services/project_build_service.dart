@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/process/native_process_service.dart';
+import '../../../core/process/process_result.dart';
 import '../../android_sdk_manager/services/android_sdk_storage_service.dart';
 import '../../gradle_manager/services/gradle_storage_service.dart';
 import '../../jdk_manager/services/jdk_storage_service.dart';
@@ -242,6 +243,235 @@ class ProjectBuildService {
       processResult: result,
       outputPath: outputFile.path,
     );
+  }
+
+  Future<String> runRuntimeDiagnostic({
+    required String projectName,
+    required ProjectBuildProgress onProgress,
+  }) async {
+    if (!Platform.isAndroid) {
+      throw UnsupportedError(
+        'Runtime diagnostic is supported only on Android.',
+      );
+    }
+
+    final projectDirectory = await ProjectService.getProjectDirectory(
+      projectName.trim(),
+    );
+
+    if (!await projectDirectory.exists()) {
+      throw StateError(
+        'Project directory does not exist: ${projectDirectory.path}',
+      );
+    }
+
+    onProgress('Checking active JDK', 0.08);
+
+    final activeJdkVersion = await _jdkStorage.readActiveVersion();
+
+    if (activeJdkVersion == null) {
+      throw StateError('No active JDK selected.');
+    }
+
+    final jdkPath = await _jdkStorage.getInstalledPath(activeJdkVersion);
+
+    if (jdkPath == null) {
+      throw StateError(
+        'Active JDK $activeJdkVersion is not installed correctly.',
+      );
+    }
+
+    onProgress('Checking active Gradle', 0.16);
+
+    final activeGradleVersion = await _gradleStorage.readActiveVersion();
+
+    if (activeGradleVersion == null || activeGradleVersion.trim().isEmpty) {
+      throw StateError('No active Gradle version selected.');
+    }
+
+    final gradlePath = await _gradleStorage.getInstalledPath(
+      activeGradleVersion,
+    );
+
+    if (gradlePath == null) {
+      throw StateError(
+        'Active Gradle $activeGradleVersion is not installed correctly.',
+      );
+    }
+
+    final javaExecutable = File('$jdkPath/bin/java');
+    final javacExecutable = File('$jdkPath/bin/javac');
+    final gradleLauncher = File(
+      '$gradlePath/lib/gradle-launcher-$activeGradleVersion.jar',
+    );
+
+    if (!await javaExecutable.exists()) {
+      throw StateError('Java executable is missing: ${javaExecutable.path}');
+    }
+
+    if (!await javacExecutable.exists()) {
+      throw StateError('Javac executable is missing: ${javacExecutable.path}');
+    }
+
+    if (!await gradleLauncher.exists()) {
+      throw StateError(
+        'Gradle launcher JAR is missing: ${gradleLauncher.path}',
+      );
+    }
+
+    final supportDirectory = await getApplicationSupportDirectory();
+
+    final diagnosticDirectory = Directory(
+      '${supportDirectory.path}/DroidForge/'
+      'runtime-diagnostic',
+    );
+
+    final temporaryDirectory = Directory('${diagnosticDirectory.path}/tmp');
+
+    final gradleUserHome = Directory(
+      '${diagnosticDirectory.path}/gradle-user-home',
+    );
+
+    await temporaryDirectory.create(recursive: true);
+    await gradleUserHome.create(recursive: true);
+
+    final environment = <String, String>{
+      'JAVA_HOME': jdkPath,
+      'GRADLE_HOME': gradlePath,
+      'GRADLE_USER_HOME': gradleUserHome.path,
+      'HOME': diagnosticDirectory.path,
+      'TMPDIR': temporaryDirectory.path,
+      'PATH': <String>[
+        '$jdkPath/bin',
+        '$gradlePath/bin',
+        '/system/bin',
+        '/system/xbin',
+      ].join(':'),
+      'LD_LIBRARY_PATH': <String>[
+        '$jdkPath/lib',
+        '$jdkPath/lib/server',
+      ].join(':'),
+    };
+
+    final report = StringBuffer()
+      ..writeln('DROIDFORGE RUNTIME DIAGNOSTIC')
+      ..writeln('================================')
+      ..writeln('Project: ${projectDirectory.path}')
+      ..writeln('JDK: $jdkPath')
+      ..writeln('Gradle: $gradlePath')
+      ..writeln('Gradle launcher: ${gradleLauncher.path}')
+      ..writeln();
+
+    onProgress('Testing java -version', 0.28);
+
+    final javaResult = await _processService.runAndroidElf(
+      executable: javaExecutable.path,
+      arguments: const <String>['-version'],
+      workingDirectory: diagnosticDirectory.path,
+      environment: environment,
+      timeout: const Duration(seconds: 45),
+    );
+
+    _appendDiagnosticResult(
+      report: report,
+      title: 'TEST 1 — JAVA VERSION',
+      result: javaResult,
+    );
+
+    onProgress('Testing javac -version', 0.48);
+
+    final javacResult = await _processService.runAndroidElf(
+      executable: javacExecutable.path,
+      arguments: const <String>['-version'],
+      workingDirectory: diagnosticDirectory.path,
+      environment: environment,
+      timeout: const Duration(seconds: 45),
+    );
+
+    _appendDiagnosticResult(
+      report: report,
+      title: 'TEST 2 — JAVAC VERSION',
+      result: javacResult,
+    );
+
+    onProgress('Testing Gradle launcher', 0.68);
+
+    final gradleResult = await _processService.runAndroidElf(
+      executable: javaExecutable.path,
+      arguments: <String>[
+        '-Xmx512m',
+        '-Dfile.encoding=UTF-8',
+        '-Djava.io.tmpdir=${temporaryDirectory.path}',
+        '-Duser.home=${diagnosticDirectory.path}',
+        '-Dorg.gradle.daemon=false',
+        '-Dorg.gradle.native=false',
+        '-Dorg.gradle.vfs.watch=false',
+        '-Dorg.gradle.workers.max=1',
+        '-classpath',
+        gradleLauncher.path,
+        'org.gradle.launcher.GradleMain',
+        '--version',
+        '--no-daemon',
+        '--no-watch-fs',
+        '--console=plain',
+      ],
+      workingDirectory: projectDirectory.path,
+      environment: environment,
+      timeout: const Duration(minutes: 3),
+    );
+
+    _appendDiagnosticResult(
+      report: report,
+      title: 'TEST 3 — GRADLE LAUNCHER VERSION',
+      result: gradleResult,
+    );
+
+    onProgress('Diagnostic complete', 1);
+
+    report
+      ..writeln('DIAGNOSTIC SUMMARY')
+      ..writeln('================================')
+      ..writeln('java -version: ${_diagnosticStatus(javaResult)}')
+      ..writeln('javac -version: ${_diagnosticStatus(javacResult)}')
+      ..writeln('Gradle launcher: ${_diagnosticStatus(gradleResult)}');
+
+    return report.toString().trim();
+  }
+
+  void _appendDiagnosticResult({
+    required StringBuffer report,
+    required String title,
+    required ProcessExecutionResult result,
+  }) {
+    report
+      ..writeln(title)
+      ..writeln('--------------------------------')
+      ..writeln('Command:')
+      ..writeln(result.command.join(' '))
+      ..writeln()
+      ..writeln('Exit code: ${result.exitCode}')
+      ..writeln('Timed out: ${result.timedOut}')
+      ..writeln('Duration: ${result.durationMs} ms')
+      ..writeln()
+      ..writeln('STDOUT:')
+      ..writeln(result.stdout.trim().isEmpty ? '<empty>' : result.stdout.trim())
+      ..writeln()
+      ..writeln('STDERR:')
+      ..writeln(result.stderr.trim().isEmpty ? '<empty>' : result.stderr.trim())
+      ..writeln()
+      ..writeln();
+  }
+
+  String _diagnosticStatus(ProcessExecutionResult result) {
+    if (result.timedOut) {
+      return 'TIMEOUT';
+    }
+
+    if (result.succeeded) {
+      return 'PASSED';
+    }
+
+    return 'FAILED — exit code ${result.exitCode}';
   }
 
   Future<void> _validateProject(Directory projectDirectory) async {

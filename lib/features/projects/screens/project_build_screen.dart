@@ -16,15 +16,20 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
   final ProjectBuildService _buildService = ProjectBuildService();
 
   ProjectBuildType _selectedType = ProjectBuildType.debugApk;
+
   ProjectBuildResult? _result;
 
   bool _building = false;
+  bool _diagnosing = false;
+
   double _progress = 0;
   String _stage = 'Ready';
   String _log = '';
 
+  bool get _busy => _building || _diagnosing;
+
   Future<void> _startBuild() async {
-    if (_building) {
+    if (_busy) {
       return;
     }
 
@@ -40,16 +45,7 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
       final result = await _buildService.build(
         projectName: widget.projectName,
         type: _selectedType,
-        onProgress: (stage, progress) {
-          if (!mounted) {
-            return;
-          }
-
-          setState(() {
-            _stage = stage;
-            _progress = progress.clamp(0.0, 1.0);
-          });
-        },
+        onProgress: _updateProgress,
       );
 
       if (!mounted) {
@@ -65,7 +61,10 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${result.type.displayName} created successfully.'),
+          content: Text(
+            '${result.type.displayName} '
+            'created successfully.',
+          ),
         ),
       );
     } catch (error) {
@@ -90,8 +89,73 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
     }
   }
 
+  Future<void> _startDiagnostic() async {
+    if (_busy) {
+      return;
+    }
+
+    setState(() {
+      _diagnosing = true;
+      _result = null;
+      _progress = 0;
+      _stage = 'Preparing runtime diagnostic';
+      _log = '';
+    });
+
+    try {
+      final report = await _buildService.runRuntimeDiagnostic(
+        projectName: widget.projectName,
+        onProgress: _updateProgress,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _stage = 'Runtime diagnostic completed';
+        _progress = 1;
+        _log = report;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Runtime diagnostic completed.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _stage = 'Runtime diagnostic failed';
+        _log = error.toString();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Runtime diagnostic could not complete.')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _diagnosing = false;
+        });
+      }
+    }
+  }
+
+  void _updateProgress(String stage, double progress) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _stage = stage;
+      _progress = progress.clamp(0.0, 1.0);
+    });
+  }
+
   void _selectType(ProjectBuildType type) {
-    if (_building) {
+    if (_busy) {
       return;
     }
 
@@ -111,7 +175,7 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         selected: selected,
-        enabled: !_building,
+        enabled: !_busy,
         onTap: () => _selectType(type),
         leading: Icon(_iconFor(type)),
         title: Text(type.displayName),
@@ -165,7 +229,7 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
           _buildTypeCard(ProjectBuildType.releaseAab),
           const SizedBox(height: 20),
           FilledButton.icon(
-            onPressed: _building ? null : _startBuild,
+            onPressed: _busy ? null : _startBuild,
             icon: _building
                 ? const SizedBox.square(
                     dimension: 20,
@@ -173,7 +237,23 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
                   )
                 : const Icon(Icons.build),
             label: Text(
-              _building ? 'Building...' : 'Build ${_selectedType.displayName}',
+              _building
+                  ? 'Building...'
+                  : 'Build '
+                        '${_selectedType.displayName}',
+            ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _startDiagnostic,
+            icon: _diagnosing
+                ? const SizedBox.square(
+                    dimension: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.monitor_heart_outlined),
+            label: Text(
+              _diagnosing ? 'Running diagnostic...' : 'Run Runtime Diagnostic',
             ),
           ),
           const SizedBox(height: 16),
@@ -184,12 +264,12 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Build status',
+                    'Build and runtime status',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
                   LinearProgressIndicator(
-                    value: _building || _progress > 0 ? _progress : 0,
+                    value: _busy || _progress > 0 ? _progress : 0,
                   ),
                   const SizedBox(height: 12),
                   Text(_stage),
@@ -212,9 +292,9 @@ class _ProjectBuildScreenState extends State<ProjectBuildScreen> {
             const SizedBox(height: 12),
             Card(
               child: ExpansionTile(
-                initiallyExpanded: result == null,
+                initiallyExpanded: true,
                 leading: const Icon(Icons.terminal),
-                title: const Text('Build log'),
+                title: const Text('Build / diagnostic log'),
                 children: [
                   Container(
                     width: double.infinity,
