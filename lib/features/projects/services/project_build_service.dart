@@ -175,7 +175,6 @@ class ProjectBuildService {
         '/system/bin',
         '/system/xbin',
       ].join(':'),
-      'LD_LIBRARY_PATH': ['$jdkPath/lib', '$jdkPath/lib/server'].join(':'),
     };
 
     final result = await _processService.runAndroidElf(
@@ -346,10 +345,6 @@ class ProjectBuildService {
         '$gradlePath/bin',
         '/system/bin',
         '/system/xbin',
-      ].join(':'),
-      'LD_LIBRARY_PATH': <String>[
-        '$jdkPath/lib',
-        '$jdkPath/lib/server',
       ].join(':'),
     };
 

@@ -132,6 +132,7 @@ include(":app")
     return '''
 org.gradle.daemon=false
 org.gradle.native=false
+org.gradle.internal.native=false
 org.gradle.vfs.watch=false
 org.gradle.workers.max=1
 android.useAndroidX=true
