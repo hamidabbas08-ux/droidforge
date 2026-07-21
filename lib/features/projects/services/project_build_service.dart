@@ -99,10 +99,26 @@ class ProjectBuildService {
     }
 
     final gradleExecutable = File('$gradlePath/bin/gradle');
+    final javaExecutable = File('$jdkPath/bin/java');
+    final javacExecutable = File('$jdkPath/bin/javac');
 
     if (!await gradleExecutable.exists()) {
       throw StateError('Gradle launcher is missing: ${gradleExecutable.path}');
     }
+
+    if (!await javaExecutable.exists()) {
+      throw StateError('Java executable is missing: ${javaExecutable.path}');
+    }
+
+    if (!await javacExecutable.exists()) {
+      throw StateError('Java compiler is missing: ${javacExecutable.path}');
+    }
+
+    onProgress('Preparing toolchain permissions', 0.24);
+
+    await _makeExecutable(javaExecutable);
+    await _makeExecutable(javacExecutable);
+    await _makeExecutable(gradleExecutable);
 
     onProgress('Checking Android SDK', 0.28);
 
@@ -130,8 +146,6 @@ class ProjectBuildService {
 
     await gradleUserHome.create(recursive: true);
     await temporaryDirectory.create(recursive: true);
-
-    await _makeExecutable(gradleExecutable);
 
     onProgress('Running ${type.displayName} build', 0.35);
 
