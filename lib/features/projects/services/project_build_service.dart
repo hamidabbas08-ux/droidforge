@@ -201,6 +201,7 @@ class ProjectBuildService {
         'org.gradle.launcher.GradleMain',
         '--no-daemon',
         '--stacktrace',
+        '--info',
         '--console=plain',
         '--no-watch-fs',
         '--max-workers=1',
