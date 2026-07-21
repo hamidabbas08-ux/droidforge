@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import '../models/file_tree_node.dart';
 import '../services/project_service.dart';
 import '../widgets/file_tree_widget.dart';
+import 'project_build_screen.dart';
 import 'project_popup_menu.dart';
 
 class ProjectExplorerScreen extends StatefulWidget {
-  final String projectName;
-
   const ProjectExplorerScreen({super.key, required this.projectName});
+
+  final String projectName;
 
   @override
   State<ProjectExplorerScreen> createState() => _ProjectExplorerScreenState();
@@ -30,14 +31,18 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
     try {
       final result = await ProjectService.loadProjectTree(widget.projectName);
 
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         tree = result;
         loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
 
       setState(() => loading = false);
 
@@ -48,17 +53,30 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
   }
 
   Future<void> _newFile(String name) async {
-    if (tree == null) return;
+    if (tree == null) {
+      return;
+    }
 
     await ProjectService.createFile(tree!.path, name);
     await _reloadTree();
   }
 
   Future<void> _newFolder(String name) async {
-    if (tree == null) return;
+    if (tree == null) {
+      return;
+    }
 
     await ProjectService.createFolder(tree!.path, name);
     await _reloadTree();
+  }
+
+  void _openBuildScreen() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (context) =>
+            ProjectBuildScreen(projectName: widget.projectName),
+      ),
+    );
   }
 
   @override
@@ -67,7 +85,16 @@ class _ProjectExplorerScreenState extends State<ProjectExplorerScreen> {
       appBar: AppBar(
         title: Text(widget.projectName),
         actions: [
-          ProjectPopupMenu(onCreateFile: _newFile, onCreateFolder: _newFolder),
+          IconButton(
+            tooltip: 'Build Project',
+            onPressed: _openBuildScreen,
+            icon: const Icon(Icons.build),
+          ),
+          ProjectPopupMenu(
+            onCreateFile: _newFile,
+            onCreateFolder: _newFolder,
+            onBuildProject: _openBuildScreen,
+          ),
         ],
       ),
       body: Builder(

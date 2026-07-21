@@ -5,10 +5,12 @@ class ProjectPopupMenu extends StatelessWidget {
     super.key,
     required this.onCreateFile,
     required this.onCreateFolder,
+    required this.onBuildProject,
   });
 
   final Future<void> Function(String name) onCreateFile;
   final Future<void> Function(String name) onCreateFolder;
+  final VoidCallback onBuildProject;
 
   Future<String?> _showNameDialog(
     BuildContext context, {
@@ -38,7 +40,9 @@ class ProjectPopupMenu extends StatelessWidget {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                },
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -61,6 +65,11 @@ class ProjectPopupMenu extends StatelessWidget {
   }
 
   Future<void> _handleSelection(BuildContext context, String action) async {
+    if (action == 'build') {
+      onBuildProject();
+      return;
+    }
+
     final creatingFile = action == 'file';
 
     final name = await _showNameDialog(
@@ -88,6 +97,15 @@ class ProjectPopupMenu extends StatelessWidget {
         _handleSelection(context, action);
       },
       itemBuilder: (context) => const [
+        PopupMenuItem<String>(
+          value: 'build',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.build),
+            title: Text('Build Project'),
+          ),
+        ),
+        PopupMenuDivider(),
         PopupMenuItem<String>(
           value: 'file',
           child: ListTile(
