@@ -141,8 +141,6 @@ class ProjectBuildService {
       sdkPath: sdkPath,
     );
 
-    await _writeAndroidGradleProperties(projectDirectory);
-
     final supportDirectory = await getApplicationSupportDirectory();
 
     final gradleUserHome = Directory(
@@ -156,6 +154,19 @@ class ProjectBuildService {
 
     await gradleUserHome.create(recursive: true);
     await temporaryDirectory.create(recursive: true);
+
+    final gradleJvmArguments = <String>[
+      '-Xmx512m',
+      '-Xint',
+      '-Dfile.encoding=UTF-8',
+      '-Djava.io.tmpdir=${temporaryDirectory.path}',
+      '-Duser.home=${supportDirectory.path}',
+    ];
+
+    await _writeAndroidGradleProperties(
+      projectDirectory,
+      gradleJvmArguments: gradleJvmArguments,
+    );
 
     onProgress('Running ${type.displayName} build', 0.35);
 
@@ -180,11 +191,7 @@ class ProjectBuildService {
     final result = await _processService.runAndroidElf(
       executable: javaExecutable.path,
       arguments: <String>[
-        '-Xmx512m',
-        '-Xint',
-        '-Dfile.encoding=UTF-8',
-        '-Djava.io.tmpdir=${temporaryDirectory.path}',
-        '-Duser.home=${supportDirectory.path}',
+        ...gradleJvmArguments,
         '-Dorg.gradle.daemon=false',
         '-Dorg.gradle.native=false',
         '-Dorg.gradle.vfs.watch=false',
@@ -497,7 +504,10 @@ class ProjectBuildService {
     }
   }
 
-  Future<void> _writeAndroidGradleProperties(Directory projectDirectory) async {
+  Future<void> _writeAndroidGradleProperties(
+    Directory projectDirectory, {
+    required List<String> gradleJvmArguments,
+  }) async {
     final file = File('${projectDirectory.path}/gradle.properties');
 
     final existing = await file.exists()
@@ -533,9 +543,10 @@ class ProjectBuildService {
       preserved.removeLast();
     }
 
-    preserved.addAll(const <String>[
+    preserved.addAll(<String>[
       '',
       '# DroidForge Android runtime settings',
+      'org.gradle.jvmargs=${gradleJvmArguments.join(' ')}',
       'org.gradle.daemon=false',
       'org.gradle.native=false',
       'org.gradle.vfs.watch=false',
