@@ -181,6 +181,7 @@ class ProjectBuildService {
       executable: javaExecutable.path,
       arguments: <String>[
         '-Xmx512m',
+        '-Xint',
         '-Dfile.encoding=UTF-8',
         '-Djava.io.tmpdir=${temporaryDirectory.path}',
         '-Duser.home=${supportDirectory.path}',
@@ -395,6 +396,7 @@ class ProjectBuildService {
       executable: javaExecutable.path,
       arguments: <String>[
         '-Xmx512m',
+        '-Xint',
         '-Dfile.encoding=UTF-8',
         '-Djava.io.tmpdir=${temporaryDirectory.path}',
         '-Duser.home=${diagnosticDirectory.path}',
