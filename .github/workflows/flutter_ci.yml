@@ -2,7 +2,8 @@ name: Flutter Android Build
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
@@ -23,57 +24,49 @@ jobs:
           cache: true
 
       - name: Verify signing secrets
-        shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.DROIDFORGE_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.DROIDFORGE_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.DROIDFORGE_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.DROIDFORGE_KEY_ALIAS }}
         run: |
           set -euo pipefail
 
-          if [ -z "$KEYSTORE_BASE64" ]; then
-            echo "DROIDFORGE_KEYSTORE_BASE64 secret is missing"
+          test -n "$KEYSTORE_BASE64" || {
+            echo "DROIDFORGE_KEYSTORE_BASE64 is missing"
             exit 1
-          fi
+          }
 
-          if [ -z "$STORE_PASSWORD" ]; then
-            echo "DROIDFORGE_STORE_PASSWORD secret is missing"
+          test -n "$STORE_PASSWORD" || {
+            echo "DROIDFORGE_STORE_PASSWORD is missing"
             exit 1
-          fi
+          }
 
-          if [ -z "$KEY_PASSWORD" ]; then
-            echo "DROIDFORGE_KEY_PASSWORD secret is missing"
+          test -n "$KEY_ALIAS" || {
+            echo "DROIDFORGE_KEY_ALIAS is missing"
             exit 1
-          fi
+          }
 
-          if [ -z "$KEY_ALIAS" ]; then
-            echo "DROIDFORGE_KEY_ALIAS secret is missing"
-            exit 1
-          fi
-
-      - name: Restore permanent DroidForge signing key
-        shell: bash
+      - name: Restore and verify permanent DroidForge signing key
         env:
           KEYSTORE_BASE64: ${{ secrets.DROIDFORGE_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.DROIDFORGE_STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.DROIDFORGE_KEY_PASSWORD }}
           KEY_ALIAS: ${{ secrets.DROIDFORGE_KEY_ALIAS }}
         run: |
           set -euo pipefail
 
-          printf '%s' "$KEYSTORE_BASE64" \
-            | base64 --decode \
-            > android/droidforge-ci.jks
+          printf '%s' "$KEYSTORE_BASE64" |
+            base64 --decode > android/droidforge-ci.jks
+
+          test -s android/droidforge-ci.jks
+
+          keytool -list \
+            -keystore android/droidforge-ci.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS"
 
           chmod 600 android/droidforge-ci.jks
 
-          cat > android/key.properties <<EOF
-          storePassword=$STORE_PASSWORD
-          keyPassword=$STORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          storeFile=droidforge-ci.jks
-          EOF
+          echo "Permanent signing key verified successfully."
 
       - name: Get dependencies
         run: flutter pub get
@@ -82,15 +75,25 @@ jobs:
         run: flutter analyze
 
       - name: Build permanently signed debug APK
-        run: |
-          flutter build apk \
-            --debug \
-            --build-number="${{ github.run_number }}"
-
-      - name: Verify APK signature
-        shell: bash
+        env:
+          DROIDFORGE_KEYSTORE_PATH: droidforge-ci.jks
+          DROIDFORGE_STORE_PASSWORD: ${{ secrets.DROIDFORGE_STORE_PASSWORD }}
+          DROIDFORGE_KEY_PASSWORD: ${{ secrets.DROIDFORGE_STORE_PASSWORD }}
+          DROIDFORGE_KEY_ALIAS: ${{ secrets.DROIDFORGE_KEY_ALIAS }}
         run: |
           set -euo pipefail
+
+          flutter build apk \
+            --debug \
+            --target-platform android-arm64
+
+      - name: Verify APK signature
+        run: |
+          set -euo pipefail
+
+          APK_PATH="build/app/outputs/flutter-apk/app-debug.apk"
+
+          test -s "$APK_PATH"
 
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" \
             -type f \
@@ -98,19 +101,16 @@ jobs:
             | sort -V \
             | tail -n 1)"
 
-          if [ -z "$APKSIGNER" ]; then
-            echo "apksigner was not found"
-            exit 1
-          fi
+          test -n "$APKSIGNER"
 
           "$APKSIGNER" verify \
             --verbose \
             --print-certs \
-            build/app/outputs/flutter-apk/app-debug.apk
+            "$APK_PATH"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DroidForge-permanent-debug-apk
+          name: DroidForge-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error

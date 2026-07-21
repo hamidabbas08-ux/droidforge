@@ -1,20 +1,25 @@
-import java.io.FileInputStream
-import java.util.Properties
-
 plugins {
     id("com.android.application")
-    // The Flutter Gradle Plugin must be applied after Android and Kotlin plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val keystoreProperties = Properties()
-val keystorePropertiesFile = rootProject.file("key.properties")
+val droidForgeKeystorePath =
+    System.getenv("DROIDFORGE_KEYSTORE_PATH")
 
-if (keystorePropertiesFile.exists()) {
-    FileInputStream(keystorePropertiesFile).use {
-        keystoreProperties.load(it)
-    }
-}
+val droidForgeStorePassword =
+    System.getenv("DROIDFORGE_STORE_PASSWORD")
+
+val droidForgeKeyPassword =
+    System.getenv("DROIDFORGE_KEY_PASSWORD")
+
+val droidForgeKeyAlias =
+    System.getenv("DROIDFORGE_KEY_ALIAS")
+
+val hasPermanentSigning =
+    !droidForgeKeystorePath.isNullOrBlank() &&
+        !droidForgeStorePassword.isNullOrBlank() &&
+        !droidForgeKeyPassword.isNullOrBlank() &&
+        !droidForgeKeyAlias.isNullOrBlank()
 
 android {
     packaging {
@@ -45,36 +50,28 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (hasPermanentSigning) {
             create("droidforgePermanent") {
-                val configuredStoreFile =
-                    keystoreProperties.getProperty("storeFile")
-                        ?: error("storeFile is missing from key.properties")
-
-                storeFile = rootProject.file(configuredStoreFile)
-                storePassword =
-                    keystoreProperties.getProperty("storePassword")
-                        ?: error("storePassword is missing from key.properties")
-                keyAlias =
-                    keystoreProperties.getProperty("keyAlias")
-                        ?: error("keyAlias is missing from key.properties")
-                keyPassword =
-                    keystoreProperties.getProperty("keyPassword")
-                        ?: error("keyPassword is missing from key.properties")
+                storeFile = rootProject.file(droidForgeKeystorePath!!)
+                storePassword = droidForgeStorePassword
+                keyAlias = droidForgeKeyAlias
+                keyPassword = droidForgeKeyPassword
             }
         }
     }
 
     buildTypes {
         debug {
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("droidforgePermanent")
+            if (hasPermanentSigning) {
+                signingConfig =
+                    signingConfigs.getByName("droidforgePermanent")
             }
         }
 
         release {
-            if (keystorePropertiesFile.exists()) {
-                signingConfig = signingConfigs.getByName("droidforgePermanent")
+            if (hasPermanentSigning) {
+                signingConfig =
+                    signingConfigs.getByName("droidforgePermanent")
             } else {
                 signingConfig = signingConfigs.getByName("debug")
             }
