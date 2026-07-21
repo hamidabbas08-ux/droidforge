@@ -35,7 +35,7 @@ class AndroidSdkInstallerService {
     );
 
     final archiveFile = File(
-      '${parentDirectory.path}/.${bundle.assetName}.part',
+      '${parentDirectory.path}/.part-${bundle.assetName}',
     );
 
     final backupDirectory = Directory(
