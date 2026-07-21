@@ -51,7 +51,7 @@ android {
                     keystoreProperties.getProperty("storeFile")
                         ?: error("storeFile is missing from key.properties")
 
-                storeFile = file(configuredStoreFile)
+                storeFile = rootProject.file(configuredStoreFile)
                 storePassword =
                     keystoreProperties.getProperty("storePassword")
                         ?: error("storePassword is missing from key.properties")
