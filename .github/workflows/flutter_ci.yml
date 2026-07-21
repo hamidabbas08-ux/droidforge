@@ -70,7 +70,7 @@ jobs:
 
           cat > android/key.properties <<EOF
           storePassword=$STORE_PASSWORD
-          keyPassword=$KEY_PASSWORD
+          keyPassword=$STORE_PASSWORD
           keyAlias=$KEY_ALIAS
           storeFile=droidforge-ci.jks
           EOF
