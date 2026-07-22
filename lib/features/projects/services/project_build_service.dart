@@ -168,7 +168,6 @@ class ProjectBuildService {
       '-XX:MaxMetaspaceSize=384m',
       '-XX:+HeapDumpOnOutOfMemoryError',
       '-XX:ErrorFile=${temporaryDirectory.path}/hs_err_pid%p.log',
-      '-Xlog:os+signal=debug',
       '-Xms256m',
       '-Xmx512m',
       '-Dfile.encoding=UTF-8',
