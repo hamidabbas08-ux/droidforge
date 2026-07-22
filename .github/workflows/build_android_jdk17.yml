@@ -1,0 +1,117 @@
+name: Build Android JDK 17 Package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-jdk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install archive tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xz-utils curl jq
+
+      - name: Download Termux package metadata
+        run: |
+          set -euo pipefail
+
+          mkdir -p jdk-build/packages
+
+          curl -L \
+            https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages \
+            -o jdk-build/Packages
+
+          test -s jdk-build/Packages
+
+      - name: Locate OpenJDK 17 package
+        run: |
+          set -euo pipefail
+
+          PACKAGE_PATH="$(
+            awk '
+              BEGIN { RS=""; FS="\n" }
+              $0 ~ /^Package: openjdk-17$/ {
+                for (i = 1; i <= NF; i++) {
+                  if ($i ~ /^Filename: /) {
+                    sub(/^Filename: /, "", $i)
+                    print $i
+                    exit
+                  }
+                }
+              }
+            ' jdk-build/Packages
+          )"
+
+          test -n "$PACKAGE_PATH"
+
+          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+          echo "Found package: $PACKAGE_PATH"
+
+      - name: Download OpenJDK 17 package
+        run: |
+          set -euo pipefail
+
+          curl -L \
+            "https://packages.termux.dev/apt/termux-main/$PACKAGE_PATH" \
+            -o jdk-build/openjdk-17.deb
+
+          test -s jdk-build/openjdk-17.deb
+
+      - name: Extract OpenJDK 17
+        run: |
+          set -euo pipefail
+
+          mkdir -p jdk-build/root
+
+          dpkg-deb -x \
+            jdk-build/openjdk-17.deb \
+            jdk-build/root
+
+          find jdk-build/root -maxdepth 5 -type f | head -100
+
+      - name: Create DroidForge JDK archive
+        run: |
+          set -euo pipefail
+
+          JDK_DIR="$(
+            find jdk-build/root \
+              -type f \
+              -path '*/bin/java' \
+              -print \
+              | head -n 1 \
+              | xargs dirname \
+              | xargs dirname
+          )"
+
+          test -n "$JDK_DIR"
+          test -f "$JDK_DIR/bin/java"
+          test -f "$JDK_DIR/bin/javac"
+
+          mkdir -p jdk-build/archive/jdk-17
+
+          cp -a \
+            "$JDK_DIR"/. \
+            jdk-build/archive/jdk-17/
+
+          tar \
+            -C jdk-build/archive \
+            -cJf jdk17-android-arm64.tar.xz \
+            jdk-17
+
+          sha256sum \
+            jdk17-android-arm64.tar.xz \
+            | tee jdk17-android-arm64.tar.xz.sha256
+
+      - name: Upload JDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DroidForge-Android-JDK17
+          path: |
+            jdk17-android-arm64.tar.xz
+            jdk17-android-arm64.tar.xz.sha256
+          if-no-files-found: error
