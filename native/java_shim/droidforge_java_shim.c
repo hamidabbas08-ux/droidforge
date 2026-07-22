@@ -58,7 +58,16 @@ int main(int argc, char **argv) {
      * that path directly and Android rejects it with error=13. Reporting the
      * synthetic JAVA_HOME keeps Gradle daemon launches routed through this shim.
      */
-    char **command = calloc((size_t)argc + 3, sizeof(char *));
+    /*
+     * Android linker64 requires:
+     *
+     * linker64 REAL_JAVA REAL_JAVA java-arguments...
+     *
+     * The second REAL_JAVA becomes argv[0] for the Java launcher.
+     * Without it, -Djava.home becomes argv[0] and Java reports:
+     * expected absolute path: "-Djava.home=..."
+     */
+    char **command = calloc((size_t)argc + 4, sizeof(char *));
 
     if (command == NULL) {
         fprintf(
@@ -72,13 +81,14 @@ int main(int argc, char **argv) {
 
     command[0] = (char *)linker;
     command[1] = (char *)real_java;
-    command[2] = java_home_property;
+    command[2] = (char *)real_java;
+    command[3] = java_home_property;
 
     for (int index = 1; index < argc; index++) {
-        command[index + 2] = argv[index];
+        command[index + 3] = argv[index];
     }
 
-    command[argc + 2] = NULL;
+    command[argc + 3] = NULL;
 
     execv(linker, command);
 
