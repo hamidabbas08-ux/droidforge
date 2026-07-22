@@ -3,6 +3,9 @@ name: Build Android JDK 17 Package
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-jdk:
     runs-on: ubuntu-latest
@@ -138,3 +141,27 @@ jobs:
             jdk17-android-arm64.tar.xz
             jdk17-android-arm64.tar.xz.sha256
           if-no-files-found: error
+
+      - name: Publish JDK GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_TAG="jdk17-android-17.0.20"
+          RELEASE_TITLE="DroidForge Android JDK 17.0.20"
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists: $RELEASE_TAG"
+          else
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TITLE" \
+              --notes "Android ARM64 OpenJDK 17.0.20 runtime packaged for DroidForge."
+          fi
+
+          gh release upload "$RELEASE_TAG" \
+            jdk17-android-arm64.tar.xz \
+            jdk17-android-arm64.tar.xz.sha256 \
+            --clobber
+
+          gh release view "$RELEASE_TAG"
