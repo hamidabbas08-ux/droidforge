@@ -27,8 +27,8 @@ class JdkReleaseCatalog {
         'https://github.com/hamidabbas08-ux/droidforge/'
         'releases/download/jdk17-android-17.0.20/'
         'jdk17-android-arm64.tar.xz',
-    sizeBytes: 97251388,
-    sha256: 'aacaa9ccb976c01c80ba6daef02f208fd2de1abec0bb661a2afdff34d0e41b95',
+    sizeBytes: 97261320,
+    sha256: '803e8f35efa468a87b72930757c08459700b37f3f903c1f024713162d4f5c47c',
     releaseTag: 'jdk17-android-17.0.20',
   );
 
