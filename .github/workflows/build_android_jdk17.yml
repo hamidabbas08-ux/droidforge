@@ -13,6 +13,7 @@ jobs:
 
       - name: Install archive tools
         run: |
+          set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y xz-utils curl
 
@@ -20,7 +21,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p jdk-build
+          mkdir -p jdk-build/debs jdk-build/root
 
           curl -fL \
             "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" \
@@ -28,106 +29,99 @@ jobs:
 
           test -s jdk-build/Packages
 
-      - name: Locate OpenJDK 17 package
+      - name: Download JDK and runtime dependencies
         run: |
           set -euo pipefail
 
-          PACKAGE_PATH="$(
-            awk '
-              BEGIN {
-                RS = ""
-                FS = "\n"
-              }
+          PACKAGES="
+          openjdk-17
+          libandroid-shmem
+          libandroid-spawn
+          libiconv
+          libjpeg-turbo
+          zlib
+          littlecms
+          alsa-plugins
+          libc++
+          alsa-lib
+          "
 
-              {
-                package_name = ""
-                filename = ""
-
-                for (i = 1; i <= NF; i++) {
-                  if ($i ~ /^Package:[[:space:]]*/) {
-                    package_name = $i
-                    sub(/^Package:[[:space:]]*/, "", package_name)
-                  }
-
-                  if ($i ~ /^Filename:[[:space:]]*/) {
-                    filename = $i
-                    sub(/^Filename:[[:space:]]*/, "", filename)
-                  }
+          for PACKAGE_NAME in $PACKAGES; do
+            PACKAGE_PATH="$(
+              awk -v wanted="$PACKAGE_NAME" '
+                BEGIN {
+                  RS = ""
+                  FS = "\n"
                 }
 
-                if (package_name == "openjdk-17" && filename != "") {
-                  print filename
-                  exit
+                {
+                  package_name = ""
+                  filename = ""
+
+                  for (i = 1; i <= NF; i++) {
+                    if ($i ~ /^Package:[[:space:]]*/) {
+                      package_name = $i
+                      sub(/^Package:[[:space:]]*/, "", package_name)
+                    }
+
+                    if ($i ~ /^Filename:[[:space:]]*/) {
+                      filename = $i
+                      sub(/^Filename:[[:space:]]*/, "", filename)
+                    }
+                  }
+
+                  if (package_name == wanted && filename != "") {
+                    print filename
+                    exit
+                  }
                 }
-              }
-            ' jdk-build/Packages
-          )"
+              ' jdk-build/Packages
+            )"
 
-          echo "Located package: $PACKAGE_PATH"
-          test -n "$PACKAGE_PATH"
+            echo "$PACKAGE_NAME -> $PACKAGE_PATH"
+            test -n "$PACKAGE_PATH"
 
-          echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
+            curl -fL \
+              "https://packages.termux.dev/apt/termux-main/$PACKAGE_PATH" \
+              -o "jdk-build/debs/${PACKAGE_NAME}.deb"
 
-      - name: Download OpenJDK 17 package
+            test -s "jdk-build/debs/${PACKAGE_NAME}.deb"
+
+            dpkg-deb -x \
+              "jdk-build/debs/${PACKAGE_NAME}.deb" \
+              jdk-build/root
+          done
+
+      - name: Create portable DroidForge JDK archive
         run: |
           set -euo pipefail
 
-          curl -fL \
-            "https://packages.termux.dev/apt/termux-main/$PACKAGE_PATH" \
-            -o jdk-build/openjdk-17.deb
-
-          test -s jdk-build/openjdk-17.deb
-
-          dpkg-deb --info jdk-build/openjdk-17.deb
-
-      - name: Extract OpenJDK 17
-        run: |
-          set -euo pipefail
-
-          mkdir -p jdk-build/root
-
-          dpkg-deb -x \
-            jdk-build/openjdk-17.deb \
-            jdk-build/root
-
-          find jdk-build/root \
-            -type f \
-            -path '*/bin/java' \
-            -print
-
-      - name: Create DroidForge JDK archive
-        run: |
-          set -euo pipefail
-
-          JAVA_FILE="$(
-            find jdk-build/root \
-              -type f \
-              -path '*/bin/java' \
-              -print \
-              | head -n 1
-          )"
-
-          test -n "$JAVA_FILE"
-
-          JDK_DIR="$(dirname "$(dirname "$JAVA_FILE")")"
-
-          echo "JDK directory: $JDK_DIR"
+          TERMUX_USR="jdk-build/root/data/data/com.termux/files/usr"
+          JDK_DIR="$TERMUX_USR/lib/jvm/java-17-openjdk"
 
           test -f "$JDK_DIR/bin/java"
           test -f "$JDK_DIR/bin/javac"
+          test -f "$TERMUX_USR/lib/libandroid-spawn.so"
 
-          mkdir -p jdk-build/archive/jdk-17
+          mkdir -p jdk-build/archive/jdk-17/lib/droidforge-deps
 
           cp -a \
             "$JDK_DIR"/. \
             jdk-build/archive/jdk-17/
 
+          find "$TERMUX_USR/lib" \
+            -maxdepth 1 \
+            -type f \
+            \( -name '*.so' -o -name '*.so.*' \) \
+            -exec cp -a {} jdk-build/archive/jdk-17/lib/droidforge-deps/ \;
+
+          test -f \
+            jdk-build/archive/jdk-17/lib/droidforge-deps/libandroid-spawn.so
+
           tar \
             -C jdk-build/archive \
             -cJf jdk17-android-arm64.tar.xz \
             jdk-17
-
-          test -s jdk17-android-arm64.tar.xz
 
           sha256sum \
             jdk17-android-arm64.tar.xz \
