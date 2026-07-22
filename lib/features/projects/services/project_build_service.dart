@@ -177,7 +177,7 @@ class ProjectBuildService {
       '-Duser.variant',
     ];
 
-    await _writeAndroidGradleProperties(projectDirectory, gradleJvmArguments);
+    await _writeAndroidGradleProperties(projectDirectory);
 
     onProgress('Running ${type.displayName} build', 0.35);
 
@@ -538,10 +538,7 @@ class ProjectBuildService {
     }
   }
 
-  Future<void> _writeAndroidGradleProperties(
-    Directory projectDirectory,
-    List<String> gradleJvmArguments,
-  ) async {
+  Future<void> _writeAndroidGradleProperties(Directory projectDirectory) async {
     final file = File('${projectDirectory.path}/gradle.properties');
 
     final existing = await file.exists()
@@ -580,7 +577,6 @@ class ProjectBuildService {
     preserved.addAll(<String>[
       '',
       '# DroidForge Android runtime settings',
-      'org.gradle.jvmargs=${gradleJvmArguments.join(' ')}',
       'org.gradle.daemon=false',
       'org.gradle.native=false',
       'org.gradle.vfs.watch=false',
