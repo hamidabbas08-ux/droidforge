@@ -143,6 +143,14 @@ class ProjectBuildService {
 
     final supportDirectory = await getApplicationSupportDirectory();
 
+    final javaShimPath = await _processService.getBundledJavaShimPath();
+
+    final syntheticJdkPath = await _prepareSyntheticJdkHome(
+      supportDirectory: supportDirectory,
+      realJdkPath: jdkPath,
+      javaShimPath: javaShimPath,
+    );
+
     final gradleUserHome = Directory(
       '${supportDirectory.path}/DroidForge/'
       'build-cache/gradle-user-home',
@@ -184,7 +192,8 @@ class ProjectBuildService {
         .getBundledPointerTagDisablerPath();
 
     final environment = <String, String>{
-      'JAVA_HOME': jdkPath,
+      'JAVA_HOME': syntheticJdkPath,
+      'DROIDFORGE_REAL_JAVA': javaExecutable.path,
       'LD_PRELOAD': pointerTagDisablerPath,
       'LD_LIBRARY_PATH':
           '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
@@ -195,6 +204,7 @@ class ProjectBuildService {
       'HOME': supportDirectory.path,
       'TMPDIR': temporaryDirectory.path,
       'PATH': [
+        '$syntheticJdkPath/bin',
         '$jdkPath/bin',
         '$gradlePath/bin',
         '$sdkPath/build-tools/35.0.0',
@@ -204,8 +214,8 @@ class ProjectBuildService {
       ].join(':'),
     };
 
-    final result = await _processService.runAndroidElf(
-      executable: javaExecutable.path,
+    final result = await _processService.run(
+      executable: javaShimPath,
       arguments: <String>[
         ...gradleJvmArguments,
         '-Dorg.gradle.daemon=false',
@@ -549,6 +559,58 @@ class ProjectBuildService {
         'Missing: ${missing.join(', ')}',
       );
     }
+  }
+
+  Future<String> _prepareSyntheticJdkHome({
+    required Directory supportDirectory,
+    required String realJdkPath,
+    required String javaShimPath,
+  }) async {
+    final syntheticHome = Directory(
+      '${supportDirectory.path}/DroidForge/runtime-jdk/jdk-17',
+    );
+
+    if (await syntheticHome.exists()) {
+      await syntheticHome.delete(recursive: true);
+    }
+
+    final syntheticBin = Directory('${syntheticHome.path}/bin');
+    await syntheticBin.create(recursive: true);
+
+    await Link('${syntheticBin.path}/java').create(javaShimPath);
+
+    const linkedEntries = <String>[
+      'conf',
+      'include',
+      'jmods',
+      'legal',
+      'lib',
+      'release',
+    ];
+
+    for (final entryName in linkedEntries) {
+      final realPath = '$realJdkPath/$entryName';
+      final entityType = await FileSystemEntity.type(
+        realPath,
+        followLinks: false,
+      );
+
+      if (entityType == FileSystemEntityType.notFound) {
+        continue;
+      }
+
+      await Link('${syntheticHome.path}/$entryName').create(realPath);
+    }
+
+    final syntheticJava = Link('${syntheticBin.path}/java');
+
+    if (!await syntheticJava.exists()) {
+      throw StateError(
+        'Synthetic Java launcher was not created: ${syntheticJava.path}',
+      );
+    }
+
+    return syntheticHome.path;
   }
 
   Future<void> _writeAndroidGradleProperties(Directory projectDirectory) async {
