@@ -1,6 +1,8 @@
 #include <malloc.h>
 #include <stdio.h>
 
+extern int mallopt(int parameter, int value);
+
 #ifndef M_BIONIC_SET_HEAP_TAGGING_LEVEL
 #define M_BIONIC_SET_HEAP_TAGGING_LEVEL (-204)
 #endif
