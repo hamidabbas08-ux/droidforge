@@ -33,18 +33,26 @@ jobs:
           set -euo pipefail
 
           PACKAGE_PATH="$(
-            awk '
-              BEGIN { RS=""; FS="\n" }
-              $0 ~ /^Package: openjdk-17$/ {
-                for (i = 1; i <= NF; i++) {
-                  if ($i ~ /^Filename: /) {
-                    sub(/^Filename: /, "", $i)
-                    print $i
-                    exit
-                  }
-                }
-              }
-            ' jdk-build/Packages
+            python3 - <<'PYTHON'
+from pathlib import Path
+
+content = Path("jdk-build/Packages").read_text(
+    encoding="utf-8",
+    errors="replace",
+)
+
+for block in content.split("\n\n"):
+    fields = {}
+
+    for line in block.splitlines():
+        if ": " in line:
+            key, value = line.split(": ", 1)
+            fields[key] = value
+
+    if fields.get("Package") == "openjdk-17":
+        print(fields.get("Filename", ""))
+        break
+PYTHON
           )"
 
           test -n "$PACKAGE_PATH"
