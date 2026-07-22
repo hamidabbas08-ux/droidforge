@@ -73,7 +73,12 @@ class JdkInstallerService {
       await _extractArchiveInBackground(archiveFile.path, workDirectory.path);
 
       onProgress('Validating JDK', 0.94);
-      await _validateInstallation(release, workDirectory);
+
+      final extractedJdkDirectory = await _resolveExtractedJdkRoot(
+        workDirectory,
+      );
+
+      await _validateInstallation(release, extractedJdkDirectory);
 
       onProgress('Finalizing', 0.97);
 
@@ -82,7 +87,11 @@ class JdkInstallerService {
       }
 
       try {
-        await workDirectory.rename(finalDirectory.path);
+        await extractedJdkDirectory.rename(finalDirectory.path);
+
+        if (await workDirectory.exists()) {
+          await workDirectory.delete(recursive: true);
+        }
 
         await _makeExecutablesRunnable(finalDirectory);
 
@@ -200,6 +209,46 @@ class JdkInstallerService {
         'actual: $actual',
       );
     }
+  }
+
+  Future<Directory> _resolveExtractedJdkRoot(Directory workDirectory) async {
+    if (await _isJdkRoot(workDirectory)) {
+      return workDirectory;
+    }
+
+    final entries = await workDirectory.list(followLinks: false).toList();
+
+    final directories = entries.whereType<Directory>().toList();
+    final otherEntries = entries
+        .where((entity) => entity is! Directory)
+        .toList();
+
+    if (directories.length == 1 && otherEntries.isEmpty) {
+      final candidate = directories.single;
+
+      if (await _isJdkRoot(candidate)) {
+        return candidate;
+      }
+    }
+
+    return workDirectory;
+  }
+
+  Future<bool> _isJdkRoot(Directory directory) async {
+    final requiredFiles = <File>[
+      File('${directory.path}/release'),
+      File('${directory.path}/bin/java'),
+      File('${directory.path}/bin/javac'),
+      File('${directory.path}/lib/modules'),
+    ];
+
+    for (final file in requiredFiles) {
+      if (!await file.exists()) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   Future<void> _validateInstallation(
