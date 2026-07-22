@@ -91,6 +91,59 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
     }
   }
 
+  Future<void> _reinstall(JdkInstallation installation) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Reinstall ${installation.displayName}?'),
+        content: const Text(
+          'DroidForge will download and verify the new JDK first. '
+          'If replacement fails, the existing JDK will be restored.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reinstall'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      await controller.install(installation.version);
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${installation.displayName} replaced and selected.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Replacement failed. Existing JDK was preserved.\n$error',
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _activate(JdkInstallation installation) async {
     try {
       await controller.activate(installation.version);
@@ -211,27 +264,45 @@ class _JdkManagerScreenState extends State<JdkManagerScreen> {
                       ],
                     ],
                   ),
-                  trailing: installation.isActive
-                      ? const Text('Selected')
-                      : installation.isInstalled
+                  trailing: installation.isInstalled
                       ? PopupMenuButton<String>(
+                          tooltip: installation.isActive
+                              ? 'Selected JDK options'
+                              : 'JDK options',
                           onSelected: (value) {
                             if (value == 'activate') {
                               _activate(installation);
+                            } else if (value == 'reinstall') {
+                              _reinstall(installation);
                             } else if (value == 'remove') {
                               _remove(installation);
                             }
                           },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(
-                              value: 'activate',
-                              child: Text('Use for builds'),
+                          itemBuilder: (_) => [
+                            if (!installation.isActive)
+                              const PopupMenuItem(
+                                value: 'activate',
+                                child: Text('Use for builds'),
+                              ),
+                            const PopupMenuItem(
+                              value: 'reinstall',
+                              child: Text('Reinstall / Replace'),
                             ),
-                            PopupMenuItem(
+                            const PopupMenuItem(
                               value: 'remove',
                               child: Text('Remove'),
                             ),
                           ],
+                          child: installation.isActive
+                              ? const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text('Selected'),
+                                    SizedBox(width: 4),
+                                    Icon(Icons.more_vert),
+                                  ],
+                                )
+                              : const Icon(Icons.more_vert),
                         )
                       : const Icon(Icons.chevron_right),
                   enabled: !controller.busy || installation.progress > 0,

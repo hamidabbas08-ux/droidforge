@@ -39,9 +39,14 @@ class JdkInstallerService {
       '${root.path}/.install-jdk-${release.version}',
     );
 
+    final backupDirectory = Directory(
+      '${root.path}/.backup-jdk-${release.version}',
+    );
+
     final archiveFile = File('${root.path}/.${release.assetName}.part.tar.xz');
 
     await _deleteDirectoryIfExists(workDirectory);
+    await _deleteDirectoryIfExists(backupDirectory);
     await _deleteFileIfExists(archiveFile);
 
     try {
@@ -73,27 +78,41 @@ class JdkInstallerService {
       onProgress('Finalizing', 0.97);
 
       if (await finalDirectory.exists()) {
-        await finalDirectory.delete(recursive: true);
+        await finalDirectory.rename(backupDirectory.path);
       }
 
-      await workDirectory.rename(finalDirectory.path);
+      try {
+        await workDirectory.rename(finalDirectory.path);
 
-      await _makeExecutablesRunnable(finalDirectory);
+        await _makeExecutablesRunnable(finalDirectory);
 
-      onProgress('Testing JDK runtime', 0.99);
-      await _runtimeVerifier.verify(finalDirectory.path);
+        onProgress('Testing JDK runtime', 0.99);
+        await _runtimeVerifier.verify(finalDirectory.path);
 
-      await _deleteFileIfExists(archiveFile);
+        await _storage.setActiveVersion(release.version);
 
-      await _storage.setActiveVersion(release.version);
+        await _deleteDirectoryIfExists(backupDirectory);
+        await _deleteFileIfExists(archiveFile);
 
-      onProgress('Installed and active', 1);
+        onProgress('Installed and active', 1);
 
-      return finalDirectory.path;
+        return finalDirectory.path;
+      } catch (_) {
+        await _deleteDirectoryIfExists(finalDirectory);
+
+        if (await backupDirectory.exists()) {
+          await backupDirectory.rename(finalDirectory.path);
+        }
+
+        rethrow;
+      }
     } catch (_) {
       await _deleteDirectoryIfExists(workDirectory);
-
       await _deleteFileIfExists(archiveFile);
+
+      if (!await finalDirectory.exists() && await backupDirectory.exists()) {
+        await backupDirectory.rename(finalDirectory.path);
+      }
 
       rethrow;
     }

@@ -127,13 +127,7 @@ class JdkManagerController extends ChangeNotifier {
 
       notifyListeners();
     } catch (error) {
-      _update(
-        version,
-        state: JdkInstallState.failed,
-        progress: 0,
-        error: error.toString(),
-      );
-
+      await load();
       rethrow;
     } finally {
       _busy = false;
