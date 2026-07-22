@@ -14,16 +14,16 @@ jobs:
       - name: Install archive tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y xz-utils curl jq
+          sudo apt-get install -y xz-utils curl
 
       - name: Download Termux package metadata
         run: |
           set -euo pipefail
 
-          mkdir -p jdk-build/packages
+          mkdir -p jdk-build
 
-          curl -L \
-            https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages \
+          curl -fL \
+            "https://packages.termux.dev/apt/termux-main/dists/stable/main/binary-aarch64/Packages" \
             -o jdk-build/Packages
 
           test -s jdk-build/Packages
@@ -33,42 +33,52 @@ jobs:
           set -euo pipefail
 
           PACKAGE_PATH="$(
-            python3 - <<'PYTHON'
-from pathlib import Path
+            awk '
+              BEGIN {
+                RS = ""
+                FS = "\n"
+              }
 
-content = Path("jdk-build/Packages").read_text(
-    encoding="utf-8",
-    errors="replace",
-)
+              {
+                package_name = ""
+                filename = ""
 
-for block in content.split("\n\n"):
-    fields = {}
+                for (i = 1; i <= NF; i++) {
+                  if ($i ~ /^Package:[[:space:]]*/) {
+                    package_name = $i
+                    sub(/^Package:[[:space:]]*/, "", package_name)
+                  }
 
-    for line in block.splitlines():
-        if ": " in line:
-            key, value = line.split(": ", 1)
-            fields[key] = value
+                  if ($i ~ /^Filename:[[:space:]]*/) {
+                    filename = $i
+                    sub(/^Filename:[[:space:]]*/, "", filename)
+                  }
+                }
 
-    if fields.get("Package") == "openjdk-17":
-        print(fields.get("Filename", ""))
-        break
-PYTHON
+                if (package_name == "openjdk-17" && filename != "") {
+                  print filename
+                  exit
+                }
+              }
+            ' jdk-build/Packages
           )"
 
+          echo "Located package: $PACKAGE_PATH"
           test -n "$PACKAGE_PATH"
 
           echo "PACKAGE_PATH=$PACKAGE_PATH" >> "$GITHUB_ENV"
-          echo "Found package: $PACKAGE_PATH"
 
       - name: Download OpenJDK 17 package
         run: |
           set -euo pipefail
 
-          curl -L \
+          curl -fL \
             "https://packages.termux.dev/apt/termux-main/$PACKAGE_PATH" \
             -o jdk-build/openjdk-17.deb
 
           test -s jdk-build/openjdk-17.deb
+
+          dpkg-deb --info jdk-build/openjdk-17.deb
 
       - name: Extract OpenJDK 17
         run: |
@@ -80,23 +90,29 @@ PYTHON
             jdk-build/openjdk-17.deb \
             jdk-build/root
 
-          find jdk-build/root -maxdepth 5 -type f | head -100
+          find jdk-build/root \
+            -type f \
+            -path '*/bin/java' \
+            -print
 
       - name: Create DroidForge JDK archive
         run: |
           set -euo pipefail
 
-          JDK_DIR="$(
+          JAVA_FILE="$(
             find jdk-build/root \
               -type f \
               -path '*/bin/java' \
               -print \
-              | head -n 1 \
-              | xargs dirname \
-              | xargs dirname
+              | head -n 1
           )"
 
-          test -n "$JDK_DIR"
+          test -n "$JAVA_FILE"
+
+          JDK_DIR="$(dirname "$(dirname "$JAVA_FILE")")"
+
+          echo "JDK directory: $JDK_DIR"
+
           test -f "$JDK_DIR/bin/java"
           test -f "$JDK_DIR/bin/javac"
 
@@ -111,9 +127,14 @@ PYTHON
             -cJf jdk17-android-arm64.tar.xz \
             jdk-17
 
+          test -s jdk17-android-arm64.tar.xz
+
           sha256sum \
             jdk17-android-arm64.tar.xz \
             | tee jdk17-android-arm64.tar.xz.sha256
+
+          stat -c '%n | %s bytes' \
+            jdk17-android-arm64.tar.xz
 
       - name: Upload JDK artifact
         uses: actions/upload-artifact@v4
