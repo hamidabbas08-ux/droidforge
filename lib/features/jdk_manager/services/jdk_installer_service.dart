@@ -80,6 +80,8 @@ class JdkInstallerService {
 
       await _validateInstallation(release, extractedJdkDirectory);
 
+      await _createRuntimeLibraryLinks(extractedJdkDirectory);
+
       onProgress('Finalizing', 0.97);
 
       if (await finalDirectory.exists()) {
@@ -249,6 +251,46 @@ class JdkInstallerService {
     }
 
     return true;
+  }
+
+  Future<void> _createRuntimeLibraryLinks(Directory jdkDirectory) async {
+    final dependenciesDirectory = Directory(
+      '${jdkDirectory.path}/lib/droidforge-deps',
+    );
+
+    if (!await dependenciesDirectory.exists()) {
+      return;
+    }
+
+    const aliases = <String, String>{
+      'libz.so.1': 'libz.so.1.3.2',
+      'libz.so': 'libz.so.1.3.2',
+      'libjpeg.so.8': 'libjpeg.so.8.3.2',
+      'libjpeg.so': 'libjpeg.so.8.3.2',
+      'libturbojpeg.so.0': 'libturbojpeg.so.0.5.0',
+      'libturbojpeg.so': 'libturbojpeg.so.0.5.0',
+    };
+
+    for (final entry in aliases.entries) {
+      final target = File('${dependenciesDirectory.path}/${entry.value}');
+
+      if (!await target.exists()) {
+        continue;
+      }
+
+      final link = Link('${dependenciesDirectory.path}/${entry.key}');
+
+      final existingType = await FileSystemEntity.type(
+        link.path,
+        followLinks: false,
+      );
+
+      if (existingType != FileSystemEntityType.notFound) {
+        continue;
+      }
+
+      await link.create(entry.value);
+    }
   }
 
   Future<void> _validateInstallation(
