@@ -156,7 +156,6 @@ class ProjectBuildService {
     await temporaryDirectory.create(recursive: true);
 
     final gradleJvmArguments = <String>[
-      '-Xint',
       '--add-opens=java.base/java.util=ALL-UNNAMED',
       '--add-opens=java.base/java.lang=ALL-UNNAMED',
       '--add-opens=java.base/java.lang.invoke=ALL-UNNAMED',
