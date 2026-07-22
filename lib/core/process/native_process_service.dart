@@ -48,7 +48,7 @@ class NativeProcessService {
 
     return run(
       executable: '/system/bin/linker64',
-      arguments: <String>[executable, ...arguments],
+      arguments: <String>[executable, executable, ...arguments],
       workingDirectory: workingDirectory,
       environment: environment,
       timeout: timeout,

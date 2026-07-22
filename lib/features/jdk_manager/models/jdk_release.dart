@@ -22,13 +22,14 @@ class JdkReleaseCatalog {
   static const JdkRelease jdk17 = JdkRelease(
     version: 17,
     architecture: 'arm64-v8a',
-    assetName: 'jdk17-arm64.tar.xz',
+    assetName: 'jdk17-android-arm64.tar.xz',
     downloadUrl:
-        'https://github.com/itsaky/openjdk-17-android/'
-        'releases/download/01-01-2022/jdk17-arm64.tar.xz',
-    sizeBytes: 157457188,
-    sha256: '1bfde21d5b5d6ed4632c4c36245f2a61532b8c641531c5f468148024223a2b63',
-    releaseTag: '01-01-2022',
+        'https://github.com/hamidabbas08-ux/droidforge/'
+        'releases/download/jdk17-android-17.0.20/'
+        'jdk17-android-arm64.tar.xz',
+    sizeBytes: 97251388,
+    sha256: 'aacaa9ccb976c01c80ba6daef02f208fd2de1abec0bb661a2afdff34d0e41b95',
+    releaseTag: 'jdk17-android-17.0.20',
   );
 
   static JdkRelease? forVersion(int version) {

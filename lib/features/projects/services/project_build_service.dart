@@ -183,6 +183,8 @@ class ProjectBuildService {
 
     final environment = <String, String>{
       'JAVA_HOME': jdkPath,
+      'LD_LIBRARY_PATH':
+          '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
       'ANDROID_HOME': sdkPath,
       'ANDROID_SDK_ROOT': sdkPath,
       'GRADLE_HOME': gradlePath,
@@ -356,6 +358,8 @@ class ProjectBuildService {
 
     final environment = <String, String>{
       'JAVA_HOME': jdkPath,
+      'LD_LIBRARY_PATH':
+          '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
       'GRADLE_HOME': gradlePath,
       'GRADLE_USER_HOME': gradleUserHome.path,
       'HOME': diagnosticDirectory.path,

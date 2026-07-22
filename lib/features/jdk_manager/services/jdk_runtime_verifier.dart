@@ -51,7 +51,8 @@ class JdkRuntimeVerifier {
       'HOME': jdkPath,
       'PATH': '$jdkPath/bin:/system/bin:/system/xbin',
       'TMPDIR': Directory.systemTemp.path,
-      'LD_LIBRARY_PATH': '$jdkPath/lib:$jdkPath/lib/server',
+      'LD_LIBRARY_PATH':
+          '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
     };
 
     final javaResult = await _processService.runAndroidElf(
