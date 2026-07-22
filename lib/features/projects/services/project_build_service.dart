@@ -166,6 +166,9 @@ class ProjectBuildService {
       '--add-opens=java.base/java.nio.charset=ALL-UNNAMED',
       '--add-opens=java.base/java.net=ALL-UNNAMED',
       '--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED',
+      '-XX:MaxMetaspaceSize=384m',
+      '-XX:+HeapDumpOnOutOfMemoryError',
+      '-Xms256m',
       '-Xmx512m',
       '-Dfile.encoding=UTF-8',
       '-Djava.io.tmpdir=${temporaryDirectory.path}',
@@ -174,23 +177,12 @@ class ProjectBuildService {
       '-Duser.variant',
     ];
 
-    await _writeAndroidGradleProperties(projectDirectory);
-
-    onProgress('Preparing Android Java launcher', 0.30);
-
-    final javaShimPath = await _processService.getBundledJavaShimPath();
-
-    final fakeJavaHome = await _prepareGradleJavaHome(
-      realJdkPath: jdkPath,
-      javaShimPath: javaShimPath,
-      supportDirectory: supportDirectory,
-    );
+    await _writeAndroidGradleProperties(projectDirectory, gradleJvmArguments);
 
     onProgress('Running ${type.displayName} build', 0.35);
 
     final environment = <String, String>{
-      'JAVA_HOME': fakeJavaHome.path,
-      'DROIDFORGE_REAL_JAVA': javaExecutable.path,
+      'JAVA_HOME': jdkPath,
       'ANDROID_HOME': sdkPath,
       'ANDROID_SDK_ROOT': sdkPath,
       'GRADLE_HOME': gradlePath,
@@ -198,7 +190,6 @@ class ProjectBuildService {
       'HOME': supportDirectory.path,
       'TMPDIR': temporaryDirectory.path,
       'PATH': [
-        '${fakeJavaHome.path}/bin',
         '$jdkPath/bin',
         '$gradlePath/bin',
         '$sdkPath/build-tools/35.0.0',
@@ -212,7 +203,6 @@ class ProjectBuildService {
       executable: javaExecutable.path,
       arguments: <String>[
         ...gradleJvmArguments,
-        '-Dorg.gradle.java.home=${fakeJavaHome.path}',
         '-Dorg.gradle.daemon=false',
         '-Dorg.gradle.native=false',
         '-Dorg.gradle.vfs.watch=false',
@@ -522,101 +512,6 @@ class ProjectBuildService {
     return 'FAILED — exit code ${result.exitCode}';
   }
 
-  Future<Directory> _prepareGradleJavaHome({
-    required String realJdkPath,
-    required String javaShimPath,
-    required Directory supportDirectory,
-  }) async {
-    final fakeJavaHome = Directory(
-      '${supportDirectory.path}/DroidForge/runtime/gradle-java-home',
-    );
-
-    if (await fakeJavaHome.exists()) {
-      await fakeJavaHome.delete(recursive: true);
-    }
-
-    await fakeJavaHome.create(recursive: true);
-
-    final realJdkDirectory = Directory(realJdkPath);
-
-    if (!await realJdkDirectory.exists()) {
-      throw StateError('Real JDK directory does not exist: $realJdkPath');
-    }
-
-    final shimFile = File(javaShimPath);
-
-    if (!await shimFile.exists()) {
-      throw StateError('Packaged Java shim does not exist: $javaShimPath');
-    }
-
-    await for (final entity in realJdkDirectory.list(followLinks: false)) {
-      final name = entity.uri.pathSegments
-          .where((segment) => segment.isNotEmpty)
-          .last;
-
-      if (name == 'bin') {
-        continue;
-      }
-
-      final targetPath = '${fakeJavaHome.path}/$name';
-
-      try {
-        await Link(targetPath).create(entity.path);
-      } on FileSystemException {
-        if (entity is Directory) {
-          await Directory(targetPath).create(recursive: true);
-        } else if (entity is File) {
-          await entity.copy(targetPath);
-        }
-      }
-    }
-
-    final fakeBinDirectory = Directory('${fakeJavaHome.path}/bin');
-    await fakeBinDirectory.create(recursive: true);
-
-    final realBinDirectory = Directory('$realJdkPath/bin');
-
-    await for (final entity in realBinDirectory.list(followLinks: false)) {
-      final name = entity.uri.pathSegments
-          .where((segment) => segment.isNotEmpty)
-          .last;
-
-      final targetPath = '${fakeBinDirectory.path}/$name';
-
-      if (name == 'java') {
-        continue;
-      }
-
-      try {
-        await Link(targetPath).create(entity.path);
-      } on FileSystemException {
-        if (entity is File) {
-          await entity.copy(targetPath);
-        }
-      }
-    }
-
-    final fakeJava = Link('${fakeBinDirectory.path}/java');
-
-    try {
-      await fakeJava.create(javaShimPath);
-    } on FileSystemException catch (error) {
-      throw StateError(
-        'Could not create Gradle Java shim link: ${error.message}',
-      );
-    }
-
-    final releaseFile = File('${fakeJavaHome.path}/release');
-
-    if (!await releaseFile.exists()) {
-      throw StateError(
-        'Fake Gradle JAVA_HOME is incomplete: ${fakeJavaHome.path}',
-      );
-    }
-
-    return fakeJavaHome;
-  }
-
   Future<void> _validateProject(Directory projectDirectory) async {
     final requiredFiles = <String>[
       'settings.gradle.kts',
@@ -643,7 +538,10 @@ class ProjectBuildService {
     }
   }
 
-  Future<void> _writeAndroidGradleProperties(Directory projectDirectory) async {
+  Future<void> _writeAndroidGradleProperties(
+    Directory projectDirectory,
+    List<String> gradleJvmArguments,
+  ) async {
     final file = File('${projectDirectory.path}/gradle.properties');
 
     final existing = await file.exists()
@@ -682,6 +580,7 @@ class ProjectBuildService {
     preserved.addAll(<String>[
       '',
       '# DroidForge Android runtime settings',
+      'org.gradle.jvmargs=${gradleJvmArguments.join(' ')}',
       'org.gradle.daemon=false',
       'org.gradle.native=false',
       'org.gradle.vfs.watch=false',
