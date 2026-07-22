@@ -89,6 +89,25 @@ jobs:
 
           file android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
 
+          "$CLANG" \
+            -shared \
+            -fPIC \
+            -O2 \
+            -Wall \
+            -Wextra \
+            native/pointer_tag/droidforge_disable_tags.c \
+            -o android/app/src/main/jniLibs/arm64-v8a/libdroidforge_disable_tags.so
+
+          test -s \
+            android/app/src/main/jniLibs/arm64-v8a/libdroidforge_disable_tags.so
+
+          file \
+            android/app/src/main/jniLibs/arm64-v8a/libdroidforge_disable_tags.so
+
+          readelf -d \
+            android/app/src/main/jniLibs/arm64-v8a/libdroidforge_disable_tags.so
+
+
           readelf -h             android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
 
       - name: Get dependencies

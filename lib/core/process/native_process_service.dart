@@ -9,6 +9,18 @@ class NativeProcessService {
     'com.hamid.droidforge/process',
   );
 
+  Future<String> getBundledPointerTagDisablerPath() async {
+    final path = await _channel.invokeMethod<String>(
+      'getBundledPointerTagDisablerPath',
+    );
+
+    if (path == null || path.trim().isEmpty) {
+      throw StateError('Bundled pointer-tag disabler path was not returned.');
+    }
+
+    return path;
+  }
+
   Future<String> getBundledJavaShimPath() async {
     final path = await _channel.invokeMethod<String>('getBundledJavaShimPath');
 

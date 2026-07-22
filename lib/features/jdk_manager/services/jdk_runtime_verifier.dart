@@ -46,7 +46,11 @@ class JdkRuntimeVerifier {
     await _makeExecutable(javaFile);
     await _makeExecutable(javacFile);
 
+    final pointerTagDisablerPath = await _processService
+        .getBundledPointerTagDisablerPath();
+
     final environment = <String, String>{
+      'LD_PRELOAD': pointerTagDisablerPath,
       'JAVA_HOME': jdkPath,
       'HOME': jdkPath,
       'PATH': '$jdkPath/bin:/system/bin:/system/xbin',

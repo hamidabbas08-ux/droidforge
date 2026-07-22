@@ -28,6 +28,23 @@ class MainActivity : FlutterActivity() {
             PROCESS_CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "getBundledPointerTagDisablerPath" -> {
+                    val library = java.io.File(
+                        applicationInfo.nativeLibraryDir,
+                        "libdroidforge_disable_tags.so"
+                    )
+
+                    if (!library.exists()) {
+                        result.error(
+                            "POINTER_TAG_LIBRARY_NOT_FOUND",
+                            "Bundled pointer-tag library not found: ${library.absolutePath}",
+                            null
+                        )
+                    } else {
+                        result.success(library.absolutePath)
+                    }
+                }
+
                 "getBundledJavaShimPath" -> {
                     val shim = java.io.File(
                         applicationInfo.nativeLibraryDir,

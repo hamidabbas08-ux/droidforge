@@ -181,8 +181,12 @@ class ProjectBuildService {
 
     onProgress('Running ${type.displayName} build', 0.35);
 
+    final pointerTagDisablerPath = await _processService
+        .getBundledPointerTagDisablerPath();
+
     final environment = <String, String>{
       'JAVA_HOME': jdkPath,
+      'LD_PRELOAD': pointerTagDisablerPath,
       'LD_LIBRARY_PATH':
           '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
       'ANDROID_HOME': sdkPath,
@@ -356,8 +360,12 @@ class ProjectBuildService {
     await temporaryDirectory.create(recursive: true);
     await gradleUserHome.create(recursive: true);
 
+    final pointerTagDisablerPath = await _processService
+        .getBundledPointerTagDisablerPath();
+
     final environment = <String, String>{
       'JAVA_HOME': jdkPath,
+      'LD_PRELOAD': pointerTagDisablerPath,
       'LD_LIBRARY_PATH':
           '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
       'GRADLE_HOME': gradlePath,
@@ -379,6 +387,8 @@ class ProjectBuildService {
       ..writeln('JDK: $jdkPath')
       ..writeln('Gradle: $gradlePath')
       ..writeln('Gradle launcher: ${gradleLauncher.path}')
+      ..writeln('Pointer-tag disabler: $pointerTagDisablerPath')
+      ..writeln('LD_PRELOAD: ${environment['LD_PRELOAD']}')
       ..writeln();
 
     onProgress('Testing java -version', 0.28);
