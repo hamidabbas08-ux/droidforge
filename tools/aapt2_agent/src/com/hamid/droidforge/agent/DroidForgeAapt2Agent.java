@@ -3,8 +3,6 @@ package com.hamid.droidforge.agent;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
-import java.util.ArrayList;
-import java.util.List;
 
 import jdk.internal.org.objectweb.asm.ClassReader;
 import jdk.internal.org.objectweb.asm.ClassVisitor;
@@ -22,14 +20,14 @@ public final class DroidForgeAapt2Agent {
     private static final String DAEMON_IMPL_CLASS =
             "com/android/builder/internal/aapt/v2/Aapt2DaemonImpl";
 
-    private static final String AGENT_INTERNAL_NAME =
-            "com/hamid/droidforge/agent/DroidForgeAapt2Agent";
-
     private static final String PACKAGED_AAPT2_FILENAME =
             "libdroidforge_aapt2_shim.so";
 
     private static final String ANDROID_LINKER =
             "/system/bin/linker64";
+
+    private static final String INJECTED_HELPER =
+            "droidforgePrepareAapt2Command";
 
     private DroidForgeAapt2Agent() {
     }
@@ -63,7 +61,10 @@ public final class DroidForgeAapt2Agent {
 
                 try {
                     ClassReader reader = new ClassReader(classfileBuffer);
-                    ClassWriter writer = new ClassWriter(reader, 0);
+                    ClassWriter writer = new ClassWriter(
+                            reader,
+                            ClassWriter.COMPUTE_MAXS
+                    );
 
                     ClassVisitor visitor = new ClassVisitor(
                             Opcodes.ASM7,
@@ -165,7 +166,8 @@ public final class DroidForgeAapt2Agent {
                                 ) {
                                     boolean isProcessBuilderConstructor =
                                             patchProcessLaunch
-                                                    && opcode == Opcodes.INVOKESPECIAL
+                                                    && opcode
+                                                    == Opcodes.INVOKESPECIAL
                                                     && "java/lang/ProcessBuilder"
                                                     .equals(owner)
                                                     && "<init>".equals(methodName)
@@ -174,18 +176,19 @@ public final class DroidForgeAapt2Agent {
 
                                     if (isProcessBuilderConstructor) {
                                         /*
-                                         * Stack before this call:
+                                         * Stack here:
                                          *
                                          *     uninitialized ProcessBuilder
                                          *     original command List
                                          *
-                                         * Replace the command list before invoking
-                                         * the ProcessBuilder constructor.
+                                         * Call the helper injected directly into
+                                         * Aapt2DaemonImpl. This avoids referencing
+                                         * the Java-agent class from AGP's classloader.
                                          */
                                         super.visitMethodInsn(
                                                 Opcodes.INVOKESTATIC,
-                                                AGENT_INTERNAL_NAME,
-                                                "prepareAapt2Command",
+                                                DAEMON_IMPL_CLASS,
+                                                INJECTED_HELPER,
                                                 "(Ljava/util/List;)Ljava/util/List;",
                                                 false
                                         );
@@ -200,6 +203,139 @@ public final class DroidForgeAapt2Agent {
                                     );
                                 }
                             };
+                        }
+
+                        @Override
+                        public void visitEnd() {
+                            if (DAEMON_IMPL_CLASS.equals(className)) {
+                                injectCommandHelper();
+                            }
+
+                            super.visitEnd();
+                        }
+
+                        private void injectCommandHelper() {
+                            MethodVisitor method = super.visitMethod(
+                                    Opcodes.ACC_PRIVATE
+                                            | Opcodes.ACC_STATIC
+                                            | Opcodes.ACC_SYNTHETIC,
+                                    INJECTED_HELPER,
+                                    "(Ljava/util/List;)Ljava/util/List;",
+                                    "(Ljava/util/List<Ljava/lang/String;>;)"
+                                            + "Ljava/util/List<Ljava/lang/String;>;",
+                                    null
+                            );
+
+                            method.visitCode();
+
+                            /*
+                             * ArrayList wrapped = new ArrayList(original);
+                             */
+                            method.visitTypeInsn(
+                                    Opcodes.NEW,
+                                    "java/util/ArrayList"
+                            );
+                            method.visitInsn(Opcodes.DUP);
+                            method.visitVarInsn(Opcodes.ALOAD, 0);
+                            method.visitMethodInsn(
+                                    Opcodes.INVOKESPECIAL,
+                                    "java/util/ArrayList",
+                                    "<init>",
+                                    "(Ljava/util/Collection;)V",
+                                    false
+                            );
+                            method.visitVarInsn(Opcodes.ASTORE, 1);
+
+                            /*
+                             * wrapped.add(0, original.get(0));
+                             *
+                             * Original:
+                             *   [shim, daemon]
+                             *
+                             * Becomes:
+                             *   [shim, shim, daemon]
+                             */
+                            method.visitVarInsn(Opcodes.ALOAD, 1);
+                            method.visitInsn(Opcodes.ICONST_0);
+                            method.visitVarInsn(Opcodes.ALOAD, 0);
+                            method.visitInsn(Opcodes.ICONST_0);
+                            method.visitMethodInsn(
+                                    Opcodes.INVOKEINTERFACE,
+                                    "java/util/List",
+                                    "get",
+                                    "(I)Ljava/lang/Object;",
+                                    true
+                            );
+                            method.visitMethodInsn(
+                                    Opcodes.INVOKEVIRTUAL,
+                                    "java/util/ArrayList",
+                                    "add",
+                                    "(ILjava/lang/Object;)V",
+                                    false
+                            );
+
+                            /*
+                             * wrapped.add(0, "/system/bin/linker64");
+                             *
+                             * Final:
+                             *   [linker64, shim, shim, daemon]
+                             */
+                            method.visitVarInsn(Opcodes.ALOAD, 1);
+                            method.visitInsn(Opcodes.ICONST_0);
+                            method.visitLdcInsn(ANDROID_LINKER);
+                            method.visitMethodInsn(
+                                    Opcodes.INVOKEVIRTUAL,
+                                    "java/util/ArrayList",
+                                    "add",
+                                    "(ILjava/lang/Object;)V",
+                                    false
+                            );
+
+                            method.visitFieldInsn(
+                                    Opcodes.GETSTATIC,
+                                    "java/lang/System",
+                                    "err",
+                                    "Ljava/io/PrintStream;"
+                            );
+                            method.visitVarInsn(Opcodes.ALOAD, 1);
+                            method.visitMethodInsn(
+                                    Opcodes.INVOKESTATIC,
+                                    "java/lang/String",
+                                    "valueOf",
+                                    "(Ljava/lang/Object;)Ljava/lang/String;",
+                                    false
+                            );
+                            method.visitInvokeDynamicInsn(
+                                    "makeConcatWithConstants",
+                                    "(Ljava/lang/String;)Ljava/lang/String;",
+                                    new jdk.internal.org.objectweb.asm.Handle(
+                                            Opcodes.H_INVOKESTATIC,
+                                            "java/lang/invoke/StringConcatFactory",
+                                            "makeConcatWithConstants",
+                                            "("
+                                                    + "Ljava/lang/invoke/MethodHandles$Lookup;"
+                                                    + "Ljava/lang/String;"
+                                                    + "Ljava/lang/invoke/MethodType;"
+                                                    + "Ljava/lang/String;"
+                                                    + "[Ljava/lang/Object;"
+                                                    + ")Ljava/lang/invoke/CallSite;",
+                                            false
+                                    ),
+                                    "[DroidForge AAPT2 Agent] Launch command: \u0001"
+                            );
+                            method.visitMethodInsn(
+                                    Opcodes.INVOKEVIRTUAL,
+                                    "java/io/PrintStream",
+                                    "println",
+                                    "(Ljava/lang/String;)V",
+                                    false
+                            );
+
+                            method.visitVarInsn(Opcodes.ALOAD, 1);
+                            method.visitInsn(Opcodes.ARETURN);
+
+                            method.visitMaxs(0, 0);
+                            method.visitEnd();
                         }
                     };
 
@@ -236,43 +372,5 @@ public final class DroidForgeAapt2Agent {
                 }
             }
         });
-    }
-
-    public static List<String> prepareAapt2Command(
-            List<String> originalCommand
-    ) {
-        if (
-                originalCommand == null
-                        || originalCommand.isEmpty()
-        ) {
-            return originalCommand;
-        }
-
-        String executable = originalCommand.get(0);
-
-        if (
-                executable == null
-                        || !executable.endsWith(PACKAGED_AAPT2_FILENAME)
-        ) {
-            return originalCommand;
-        }
-
-        ArrayList<String> wrappedCommand =
-                new ArrayList<>(originalCommand.size() + 2);
-
-        wrappedCommand.add(ANDROID_LINKER);
-        wrappedCommand.add(executable);
-        wrappedCommand.add(executable);
-
-        for (int index = 1; index < originalCommand.size(); index++) {
-            wrappedCommand.add(originalCommand.get(index));
-        }
-
-        System.err.println(
-                "[DroidForge AAPT2 Agent] Launch command: "
-                        + wrappedCommand
-        );
-
-        return wrappedCommand;
     }
 }
