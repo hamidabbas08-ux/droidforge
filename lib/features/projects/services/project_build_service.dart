@@ -631,6 +631,7 @@ dependencyResolutionManagement {
     await syntheticBin.create(recursive: true);
 
     await Link('${syntheticBin.path}/java').create(javaShimPath);
+    await Link('${syntheticBin.path}/javac').create(javaShimPath);
 
     const linkedEntries = <String>[
       'conf',
@@ -656,10 +657,17 @@ dependencyResolutionManagement {
     }
 
     final syntheticJava = Link('${syntheticBin.path}/java');
+    final syntheticJavac = Link('${syntheticBin.path}/javac');
 
     if (!await syntheticJava.exists()) {
       throw StateError(
         'Synthetic Java launcher was not created: ${syntheticJava.path}',
+      );
+    }
+
+    if (!await syntheticJavac.exists()) {
+      throw StateError(
+        'Synthetic Javac launcher was not created: ${syntheticJavac.path}',
       );
     }
 
