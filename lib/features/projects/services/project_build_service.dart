@@ -159,6 +159,7 @@ class ProjectBuildService {
     final supportDirectory = await getApplicationSupportDirectory();
 
     final javaShimPath = await _processService.getBundledJavaShimPath();
+    final aapt2ShimPath = await _processService.getBundledAapt2ShimPath();
 
     final syntheticJdkPath = await _prepareSyntheticJdkHome(
       supportDirectory: supportDirectory,
@@ -200,7 +201,10 @@ class ProjectBuildService {
       '-javaagent:${gradleInstrumentationAgent.path}',
     ];
 
-    await _writeAndroidGradleProperties(projectDirectory);
+    await _writeAndroidGradleProperties(
+      projectDirectory: projectDirectory,
+      aapt2ShimPath: aapt2ShimPath,
+    );
 
     onProgress('Running ${type.displayName} build', 0.35);
 
@@ -210,6 +214,7 @@ class ProjectBuildService {
     final environment = <String, String>{
       'JAVA_HOME': syntheticJdkPath,
       'DROIDFORGE_REAL_JAVA': javaExecutable.path,
+      'DROIDFORGE_REAL_AAPT2': '$sdkPath/build-tools/35.0.0/aapt2',
       'LD_PRELOAD': pointerTagDisablerPath,
       'LD_LIBRARY_PATH':
           '$jdkPath/lib/droidforge-deps:$jdkPath/lib:$jdkPath/lib/server',
@@ -699,7 +704,10 @@ dependencyResolutionManagement {
     return syntheticHome.path;
   }
 
-  Future<void> _writeAndroidGradleProperties(Directory projectDirectory) async {
+  Future<void> _writeAndroidGradleProperties({
+    required Directory projectDirectory,
+    required String aapt2ShimPath,
+  }) async {
     final file = File('${projectDirectory.path}/gradle.properties');
 
     final existing = await file.exists()
@@ -712,6 +720,7 @@ dependencyResolutionManagement {
       'org.gradle.native',
       'org.gradle.vfs.watch',
       'org.gradle.workers.max',
+      'android.aapt2FromMavenOverride',
     };
 
     final preserved = existing.where((line) {
@@ -742,6 +751,7 @@ dependencyResolutionManagement {
       'org.gradle.native=false',
       'org.gradle.vfs.watch=false',
       'org.gradle.workers.max=1',
+      'android.aapt2FromMavenOverride=$aapt2ShimPath',
     ]);
 
     await file.writeAsString('${preserved.join('\n')}\n', flush: true);

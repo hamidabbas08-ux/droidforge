@@ -62,6 +62,23 @@ class MainActivity : FlutterActivity() {
                     }
                 }
 
+                "getBundledAapt2ShimPath" -> {
+                    val shim = java.io.File(
+                        applicationInfo.nativeLibraryDir,
+                        "libdroidforge_aapt2_shim.so"
+                    )
+
+                    if (!shim.exists()) {
+                        result.error(
+                            "AAPT2_SHIM_NOT_FOUND",
+                            "Bundled AAPT2 shim not found: ${shim.absolutePath}",
+                            null
+                        )
+                    } else {
+                        result.success(shim.absolutePath)
+                    }
+                }
+
                 "runBundledNativeTest" -> {
                     processExecutor.execute {
                         try {

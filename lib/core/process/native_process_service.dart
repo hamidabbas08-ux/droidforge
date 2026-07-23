@@ -31,6 +31,16 @@ class NativeProcessService {
     return path;
   }
 
+  Future<String> getBundledAapt2ShimPath() async {
+    final path = await _channel.invokeMethod<String>('getBundledAapt2ShimPath');
+
+    if (path == null || path.trim().isEmpty) {
+      throw StateError('Bundled AAPT2 shim path was not returned.');
+    }
+
+    return path;
+  }
+
   Future<ProcessExecutionResult> runBundledNativeTest() async {
     final rawResult = await _channel.invokeMethod<Object?>(
       'runBundledNativeTest',

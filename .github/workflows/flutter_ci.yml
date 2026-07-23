@@ -90,6 +90,24 @@ jobs:
           file android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
 
           "$CLANG" \
+            -fPIE \
+            -pie \
+            -O2 \
+            -Wall \
+            -Wextra \
+            native/aapt2_shim/droidforge_aapt2_shim.c \
+            -o android/app/src/main/jniLibs/arm64-v8a/libdroidforge_aapt2_shim.so
+
+          test -s \
+            android/app/src/main/jniLibs/arm64-v8a/libdroidforge_aapt2_shim.so
+
+          file \
+            android/app/src/main/jniLibs/arm64-v8a/libdroidforge_aapt2_shim.so
+
+          readelf -h \
+            android/app/src/main/jniLibs/arm64-v8a/libdroidforge_aapt2_shim.so
+
+          "$CLANG" \
             -shared \
             -fPIC \
             -O2 \
