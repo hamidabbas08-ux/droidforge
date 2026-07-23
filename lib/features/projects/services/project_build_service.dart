@@ -159,32 +159,21 @@ class ProjectBuildService {
     final supportDirectory = await getApplicationSupportDirectory();
 
     final javaShimPath = await _processService.getBundledJavaShimPath();
-    final bundledAapt2ShimPath = await _processService
-        .getBundledAapt2ShimPath();
+    final aapt2ShimPath = await _processService.getBundledAapt2ShimPath();
 
-    final runtimeToolsDirectory = Directory(
-      '${supportDirectory.path}/DroidForge/runtime-tools',
-    );
-    await runtimeToolsDirectory.create(recursive: true);
+    final aapt2Executable = File(aapt2ShimPath);
 
-    final aapt2Launcher = File('${runtimeToolsDirectory.path}/aapt2');
-
-    if (await aapt2Launcher.exists()) {
-      await aapt2Launcher.delete();
+    if (!await aapt2Executable.exists()) {
+      throw StateError(
+        'Prepared AAPT2 executable does not exist: $aapt2ShimPath',
+      );
     }
 
-    await File(bundledAapt2ShimPath).copy(aapt2Launcher.path);
+    final aapt2Size = await aapt2Executable.length();
 
-    await _processService.runAndroidElf(
-      executable: '/system/bin/chmod',
-      arguments: <String>['700', aapt2Launcher.path],
-    );
-
-    if (!await aapt2Launcher.exists()) {
-      throw StateError('AAPT2 launcher was not created: ${aapt2Launcher.path}');
+    if (aapt2Size <= 0) {
+      throw StateError('Prepared AAPT2 executable is empty: $aapt2ShimPath');
     }
-
-    final aapt2ShimPath = aapt2Launcher.path;
 
     final syntheticJdkPath = await _prepareSyntheticJdkHome(
       supportDirectory: supportDirectory,

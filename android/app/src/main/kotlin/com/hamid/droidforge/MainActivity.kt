@@ -68,46 +68,113 @@ class MainActivity : FlutterActivity() {
                         "libdroidforge_aapt2_shim.so"
                     )
 
-                    if (!packagedShim.exists()) {
+                    if (!packagedShim.isFile || packagedShim.length() <= 0L) {
                         result.error(
                             "AAPT2_SHIM_NOT_FOUND",
-                            "Bundled AAPT2 shim not found: ${packagedShim.absolutePath}",
+                            "Bundled AAPT2 shim not found or empty: " +
+                                packagedShim.absolutePath,
                             null
                         )
                     } else {
                         try {
-                            val bundledToolsDirectory = java.io.File(
+                            val runtimeToolsDirectory = java.io.File(
                                 filesDir,
-                                "DroidForge/bundled-tools"
+                                "DroidForge/runtime-tools"
                             )
 
-                            if (!bundledToolsDirectory.exists() &&
-                                !bundledToolsDirectory.mkdirs()
+                            if (!runtimeToolsDirectory.exists() &&
+                                !runtimeToolsDirectory.mkdirs()
                             ) {
                                 throw java.io.IOException(
                                     "Could not create directory: " +
-                                        bundledToolsDirectory.absolutePath
+                                        runtimeToolsDirectory.absolutePath
                                 )
                             }
 
-                            val accessibleShim = java.io.File(
-                                bundledToolsDirectory,
-                                "aapt2-shim"
+                            val finalShim = java.io.File(
+                                runtimeToolsDirectory,
+                                "aapt2"
                             )
 
+                            val temporaryShim = java.io.File(
+                                runtimeToolsDirectory,
+                                "aapt2.tmp"
+                            )
+
+                            if (temporaryShim.exists() &&
+                                !temporaryShim.delete()
+                            ) {
+                                throw java.io.IOException(
+                                    "Could not remove old temporary AAPT2: " +
+                                        temporaryShim.absolutePath
+                                )
+                            }
+
                             packagedShim.copyTo(
-                                target = accessibleShim,
+                                target = temporaryShim,
                                 overwrite = true
                             )
 
-                            accessibleShim.setReadable(true, true)
-                            accessibleShim.setWritable(true, true)
-                            accessibleShim.setExecutable(true, true)
+                            if (temporaryShim.length() != packagedShim.length()) {
+                                throw java.io.IOException(
+                                    "AAPT2 copy size mismatch: source=" +
+                                        packagedShim.length() +
+                                        ", copied=" +
+                                        temporaryShim.length()
+                                )
+                            }
 
-                            result.success(accessibleShim.absolutePath)
+                            if (!temporaryShim.setReadable(true, false)) {
+                                throw java.io.IOException(
+                                    "Could not make AAPT2 readable."
+                                )
+                            }
+
+                            if (!temporaryShim.setWritable(true, true)) {
+                                throw java.io.IOException(
+                                    "Could not make AAPT2 writable."
+                                )
+                            }
+
+                            if (!temporaryShim.setExecutable(true, false)) {
+                                throw java.io.IOException(
+                                    "Could not make AAPT2 executable."
+                                )
+                            }
+
+                            if (finalShim.exists() && !finalShim.delete()) {
+                                throw java.io.IOException(
+                                    "Could not replace old AAPT2: " +
+                                        finalShim.absolutePath
+                                )
+                            }
+
+                            if (!temporaryShim.renameTo(finalShim)) {
+                                temporaryShim.copyTo(
+                                    target = finalShim,
+                                    overwrite = true
+                                )
+
+                                if (!temporaryShim.delete()) {
+                                    temporaryShim.deleteOnExit()
+                                }
+                            }
+
+                            finalShim.setReadable(true, false)
+                            finalShim.setWritable(true, true)
+                            finalShim.setExecutable(true, false)
+
+                            if (!finalShim.isFile || finalShim.length() <= 0L) {
+                                throw java.io.IOException(
+                                    "Final AAPT2 executable was not created: " +
+                                        finalShim.absolutePath
+                                )
+                            }
+
+                            result.success(finalShim.absolutePath)
                         } catch (error: Throwable) {
                             result.error(
-                                "AAPT2_SHIM_COPY_FAILED",
+                                "AAPT2_SHIM_PREPARE_FAILED",
                                 error.message ?: error.toString(),
                                 null
                             )
