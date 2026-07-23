@@ -63,19 +63,55 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "getBundledAapt2ShimPath" -> {
-                    val shim = java.io.File(
+                    val packagedShim = java.io.File(
                         applicationInfo.nativeLibraryDir,
                         "libdroidforge_aapt2_shim.so"
                     )
 
-                    if (!shim.exists()) {
+                    if (!packagedShim.exists()) {
                         result.error(
                             "AAPT2_SHIM_NOT_FOUND",
-                            "Bundled AAPT2 shim not found: ${shim.absolutePath}",
+                            "Bundled AAPT2 shim not found: ${packagedShim.absolutePath}",
                             null
                         )
                     } else {
-                        result.success(shim.absolutePath)
+                        try {
+                            val bundledToolsDirectory = java.io.File(
+                                filesDir,
+                                "DroidForge/bundled-tools"
+                            )
+
+                            if (!bundledToolsDirectory.exists() &&
+                                !bundledToolsDirectory.mkdirs()
+                            ) {
+                                throw java.io.IOException(
+                                    "Could not create directory: " +
+                                        bundledToolsDirectory.absolutePath
+                                )
+                            }
+
+                            val accessibleShim = java.io.File(
+                                bundledToolsDirectory,
+                                "aapt2-shim"
+                            )
+
+                            packagedShim.copyTo(
+                                target = accessibleShim,
+                                overwrite = true
+                            )
+
+                            accessibleShim.setReadable(true, true)
+                            accessibleShim.setWritable(true, true)
+                            accessibleShim.setExecutable(true, true)
+
+                            result.success(accessibleShim.absolutePath)
+                        } catch (error: Throwable) {
+                            result.error(
+                                "AAPT2_SHIM_COPY_FAILED",
+                                error.message ?: error.toString(),
+                                null
+                            )
+                        }
                     }
                 }
 
