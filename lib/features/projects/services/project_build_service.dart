@@ -167,13 +167,18 @@ class ProjectBuildService {
     );
     await runtimeToolsDirectory.create(recursive: true);
 
-    final aapt2Launcher = Link('${runtimeToolsDirectory.path}/aapt2');
+    final aapt2Launcher = File('${runtimeToolsDirectory.path}/aapt2');
 
     if (await aapt2Launcher.exists()) {
       await aapt2Launcher.delete();
     }
 
-    await aapt2Launcher.create(bundledAapt2ShimPath);
+    await File(bundledAapt2ShimPath).copy(aapt2Launcher.path);
+
+    await _processService.runAndroidElf(
+      executable: '/system/bin/chmod',
+      arguments: <String>['700', aapt2Launcher.path],
+    );
 
     if (!await aapt2Launcher.exists()) {
       throw StateError('AAPT2 launcher was not created: ${aapt2Launcher.path}');
