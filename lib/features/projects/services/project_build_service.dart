@@ -62,6 +62,7 @@ class ProjectBuildService {
     }
 
     await _validateProject(projectDirectory);
+    await _ensureProjectRepositories(projectDirectory);
 
     onProgress('Checking JDK', 0.12);
 
@@ -547,6 +548,44 @@ class ProjectBuildService {
     }
 
     return 'FAILED — exit code ${result.exitCode}';
+  }
+
+  Future<void> _ensureProjectRepositories(Directory projectDirectory) async {
+    final settingsFile = File('${projectDirectory.path}/settings.gradle.kts');
+
+    var settingsText = await settingsFile.readAsString();
+
+    const repositoryConfiguration = '''
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+''';
+
+    final hasPluginManagement = settingsText.contains('pluginManagement');
+
+    final hasGoogleRepository = settingsText.contains('google()');
+
+    if (hasPluginManagement && hasGoogleRepository) {
+      return;
+    }
+
+    settingsText = repositoryConfiguration + settingsText;
+
+    await settingsFile.writeAsString(settingsText);
   }
 
   Future<void> _validateProject(Directory projectDirectory) async {

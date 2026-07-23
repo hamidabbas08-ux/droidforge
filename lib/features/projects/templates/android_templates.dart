@@ -123,6 +123,23 @@ dependencies {
 
   static String settingsGradle({required String appName}) {
     return '''
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 rootProject.name = "$appName"
 include(":app")
 ''';
