@@ -63,83 +63,76 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "getBundledAapt2ShimPath" -> {
+                    val shim = java.io.File(
+                        applicationInfo.nativeLibraryDir,
+                        "libdroidforge_aapt2_shim.so"
+                    )
+
+                    if (!shim.isFile || shim.length() <= 0L) {
+                        result.error(
+                            "AAPT2_SHIM_NOT_FOUND",
+                            "Bundled AAPT2 shim not found or empty: ${shim.absolutePath}",
+                            null
+                        )
+                    } else {
+                        result.success(shim.absolutePath)
+                    }
+                }
+
+                "getBundledAapt2AgentPath" -> {
                     try {
-                        val packagedShim = java.io.File(
-                            applicationInfo.nativeLibraryDir,
-                            "libdroidforge_aapt2_shim.so"
-                        )
-
-                        if (!packagedShim.isFile || packagedShim.length() <= 0L) {
-                            throw java.io.FileNotFoundException(
-                                "Bundled AAPT2 shim not found or empty: " +
-                                    packagedShim.absolutePath
-                            )
-                        }
-
-                        val launcherDirectory = java.io.File(
+                        val agentDirectory = java.io.File(
                             filesDir,
-                            "DroidForge/runtime-tools"
+                            "DroidForge/runtime-agents"
                         )
 
-                        if (!launcherDirectory.exists() &&
-                            !launcherDirectory.mkdirs()
-                        ) {
+                        if (!agentDirectory.exists() && !agentDirectory.mkdirs()) {
                             throw java.io.IOException(
-                                "Unable to create AAPT2 launcher directory: " +
-                                    launcherDirectory.absolutePath
+                                "Unable to create runtime agent directory: " +
+                                    agentDirectory.absolutePath
                             )
                         }
 
-                        val launcher = java.io.File(
-                            launcherDirectory,
-                            "aapt2"
+                        val agentFile = java.io.File(
+                            agentDirectory,
+                            "droidforge-aapt2-agent.jar"
                         )
 
-                        val launcherPath = launcher.toPath()
+                        val temporaryFile = java.io.File(
+                            agentDirectory,
+                            "droidforge-aapt2-agent.jar.tmp"
+                        )
 
-                        if (
-                            launcher.exists() ||
-                            java.nio.file.Files.isSymbolicLink(launcherPath)
-                        ) {
-                            java.nio.file.Files.deleteIfExists(launcherPath)
+                        assets.open("droidforge-aapt2-agent.jar").use { input ->
+                            java.io.FileOutputStream(temporaryFile).use { output ->
+                                input.copyTo(output)
+                                output.flush()
+                                output.fd.sync()
+                            }
                         }
 
-                        android.system.Os.symlink(
-                            packagedShim.absolutePath,
-                            launcher.absolutePath
-                        )
-
-                        if (!java.nio.file.Files.isSymbolicLink(launcherPath)) {
+                        if (!temporaryFile.isFile || temporaryFile.length() <= 0L) {
                             throw java.io.IOException(
-                                "AAPT2 launcher was not created as a symbolic link: " +
-                                    launcher.absolutePath
+                                "Extracted AAPT2 agent is missing or empty"
                             )
                         }
 
-                        val linkedTarget = android.system.Os.readlink(
-                            launcher.absolutePath
-                        )
-
-                        if (linkedTarget != packagedShim.absolutePath) {
+                        if (agentFile.exists() && !agentFile.delete()) {
                             throw java.io.IOException(
-                                "AAPT2 launcher points to unexpected target: " +
-                                    linkedTarget
+                                "Unable to replace old AAPT2 agent"
                             )
                         }
 
-                        if (
-                            launcher.canonicalPath !=
-                            packagedShim.canonicalPath
-                        ) {
+                        if (!temporaryFile.renameTo(agentFile)) {
                             throw java.io.IOException(
-                                "AAPT2 launcher canonical target mismatch"
+                                "Unable to activate AAPT2 agent"
                             )
                         }
 
-                        result.success(launcher.absolutePath)
+                        result.success(agentFile.absolutePath)
                     } catch (error: Throwable) {
                         result.error(
-                            "AAPT2_LAUNCHER_FAILED",
+                            "AAPT2_AGENT_FAILED",
                             error.message ?: error.javaClass.simpleName,
                             error.stackTraceToString()
                         )

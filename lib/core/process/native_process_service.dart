@@ -41,6 +41,18 @@ class NativeProcessService {
     return path;
   }
 
+  Future<String> getBundledAapt2AgentPath() async {
+    final path = await _channel.invokeMethod<String>(
+      'getBundledAapt2AgentPath',
+    );
+
+    if (path == null || path.trim().isEmpty) {
+      throw StateError('Bundled AAPT2 agent path was not returned.');
+    }
+
+    return path;
+  }
+
   Future<ProcessExecutionResult> runBundledNativeTest() async {
     final rawResult = await _channel.invokeMethod<Object?>(
       'runBundledNativeTest',

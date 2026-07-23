@@ -160,6 +160,7 @@ class ProjectBuildService {
 
     final javaShimPath = await _processService.getBundledJavaShimPath();
     final aapt2ShimPath = await _processService.getBundledAapt2ShimPath();
+    final aapt2AgentPath = await _processService.getBundledAapt2AgentPath();
 
     final aapt2Executable = File(aapt2ShimPath);
 
@@ -212,7 +213,9 @@ class ProjectBuildService {
       '-Duser.country',
       '-Duser.language=en',
       '-Duser.variant',
+      '--add-exports=java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED',
       '-javaagent:${gradleInstrumentationAgent.path}',
+      '-javaagent:$aapt2AgentPath',
     ];
 
     await _writeAndroidGradleProperties(

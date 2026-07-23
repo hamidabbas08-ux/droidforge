@@ -128,6 +128,44 @@ jobs:
 
           readelf -h             android/app/src/main/jniLibs/arm64-v8a/libdroidforge_java_shim.so
 
+      - name: Build DroidForge AAPT2 compatibility agent
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          AGENT_BUILD_DIR="$RUNNER_TEMP/droidforge-aapt2-agent"
+          AGENT_CLASSES="$AGENT_BUILD_DIR/classes"
+          AGENT_MANIFEST="$AGENT_BUILD_DIR/MANIFEST.MF"
+          AGENT_OUTPUT="android/app/src/main/assets/droidforge-aapt2-agent.jar"
+
+          rm -rf "$AGENT_BUILD_DIR"
+          mkdir -p "$AGENT_CLASSES"
+          mkdir -p "$(dirname "$AGENT_OUTPUT")"
+
+          javac \
+            -source 17 \
+            -target 17 \
+            --add-exports \
+            java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED \
+            -d "$AGENT_CLASSES" \
+            tools/aapt2_agent/src/com/hamid/droidforge/agent/DroidForgeAapt2Agent.java
+
+          printf '%s\n' \
+            'Manifest-Version: 1.0' \
+            'Premain-Class: com.hamid.droidforge.agent.DroidForgeAapt2Agent' \
+            'Can-Redefine-Classes: false' \
+            'Can-Retransform-Classes: false' \
+            '' > "$AGENT_MANIFEST"
+
+          jar cfm \
+            "$AGENT_OUTPUT" \
+            "$AGENT_MANIFEST" \
+            -C "$AGENT_CLASSES" .
+
+          test -s "$AGENT_OUTPUT"
+          jar tf "$AGENT_OUTPUT"
+          unzip -p "$AGENT_OUTPUT" META-INF/MANIFEST.MF
+
       - name: Get dependencies
         run: flutter pub get
 
