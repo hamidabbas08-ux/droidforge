@@ -159,7 +159,27 @@ class ProjectBuildService {
     final supportDirectory = await getApplicationSupportDirectory();
 
     final javaShimPath = await _processService.getBundledJavaShimPath();
-    final aapt2ShimPath = await _processService.getBundledAapt2ShimPath();
+    final bundledAapt2ShimPath = await _processService
+        .getBundledAapt2ShimPath();
+
+    final runtimeToolsDirectory = Directory(
+      '${supportDirectory.path}/DroidForge/runtime-tools',
+    );
+    await runtimeToolsDirectory.create(recursive: true);
+
+    final aapt2Launcher = Link('${runtimeToolsDirectory.path}/aapt2');
+
+    if (await aapt2Launcher.exists()) {
+      await aapt2Launcher.delete();
+    }
+
+    await aapt2Launcher.create(bundledAapt2ShimPath);
+
+    if (!await aapt2Launcher.exists()) {
+      throw StateError('AAPT2 launcher was not created: ${aapt2Launcher.path}');
+    }
+
+    final aapt2ShimPath = aapt2Launcher.path;
 
     final syntheticJdkPath = await _prepareSyntheticJdkHome(
       supportDirectory: supportDirectory,
