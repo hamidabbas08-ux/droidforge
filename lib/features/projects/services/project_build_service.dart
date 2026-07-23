@@ -603,6 +603,13 @@ dependencyResolutionManagement {
         .replaceAll('compileSdk = 34', 'compileSdk = 35')
         .replaceAll('targetSdk = 34', 'targetSdk = 35');
 
+    if (!buildText.contains('buildToolsVersion')) {
+      buildText = buildText.replaceFirst(
+        RegExp(r'compileSdk\s*=\s*35'),
+        'compileSdk = 35\n    buildToolsVersion = "35.0.0"',
+      );
+    }
+
     await appBuildFile.writeAsString(buildText);
   }
 
