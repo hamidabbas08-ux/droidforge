@@ -3,6 +3,8 @@ package com.hamid.droidforge.agent;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
+import java.util.ArrayList;
+import java.util.List;
 
 import jdk.internal.org.objectweb.asm.ClassReader;
 import jdk.internal.org.objectweb.asm.ClassVisitor;
@@ -17,8 +19,17 @@ public final class DroidForgeAapt2Agent {
     private static final String DAEMON_SERVICE_CLASS =
             "com/android/build/gradle/internal/services/Aapt2DaemonBuildService";
 
+    private static final String DAEMON_IMPL_CLASS =
+            "com/android/builder/internal/aapt/v2/Aapt2DaemonImpl";
+
+    private static final String AGENT_INTERNAL_NAME =
+            "com/hamid/droidforge/agent/DroidForgeAapt2Agent";
+
     private static final String PACKAGED_AAPT2_FILENAME =
             "libdroidforge_aapt2_shim.so";
+
+    private static final String ANDROID_LINKER =
+            "/system/bin/linker64";
 
     private DroidForgeAapt2Agent() {
     }
@@ -45,6 +56,7 @@ public final class DroidForgeAapt2Agent {
                 if (
                         !MAVEN_COMPANION_CLASS.equals(className)
                                 && !DAEMON_SERVICE_CLASS.equals(className)
+                                && !DAEMON_IMPL_CLASS.equals(className)
                 ) {
                     return null;
                 }
@@ -81,9 +93,14 @@ public final class DroidForgeAapt2Agent {
                                     DAEMON_SERVICE_CLASS.equals(className)
                                             && "getAapt2ExecutablePath".equals(name);
 
+                            final boolean patchProcessLaunch =
+                                    DAEMON_IMPL_CLASS.equals(className)
+                                            && "startProcess".equals(name);
+
                             if (
                                     !patchOverrideValidation
                                             && !patchExecutableResolution
+                                            && !patchProcessLaunch
                             ) {
                                 return delegate;
                             }
@@ -119,29 +136,67 @@ public final class DroidForgeAapt2Agent {
                                     }
 
                                     if (patchOverrideValidation) {
-                                        /*
-                                         * Aapt2FromMaven normally requires the
-                                         * override path to end in "aapt2".
-                                         * Android packaged executables use a
-                                         * native-library .so filename.
-                                         */
                                         super.visitLdcInsn(".so");
                                         return;
                                     }
 
-                                    /*
-                                     * Aapt2DaemonBuildService normally resolves:
-                                     *
-                                     *     binaryDirectory/aapt2
-                                     *
-                                     * Resolve the actual packaged native executable
-                                     * instead:
-                                     *
-                                     *     binaryDirectory/
-                                     *     libdroidforge_aapt2_shim.so
-                                     */
-                                    super.visitLdcInsn(
-                                            PACKAGED_AAPT2_FILENAME
+                                    if (patchExecutableResolution) {
+                                        super.visitLdcInsn(
+                                                PACKAGED_AAPT2_FILENAME
+                                        );
+                                        return;
+                                    }
+
+                                    super.visitFieldInsn(
+                                            opcode,
+                                            owner,
+                                            fieldName,
+                                            fieldDescriptor
+                                    );
+                                }
+
+                                @Override
+                                public void visitMethodInsn(
+                                        int opcode,
+                                        String owner,
+                                        String methodName,
+                                        String methodDescriptor,
+                                        boolean isInterface
+                                ) {
+                                    boolean isProcessBuilderConstructor =
+                                            patchProcessLaunch
+                                                    && opcode == Opcodes.INVOKESPECIAL
+                                                    && "java/lang/ProcessBuilder"
+                                                    .equals(owner)
+                                                    && "<init>".equals(methodName)
+                                                    && "(Ljava/util/List;)V"
+                                                    .equals(methodDescriptor);
+
+                                    if (isProcessBuilderConstructor) {
+                                        /*
+                                         * Stack before this call:
+                                         *
+                                         *     uninitialized ProcessBuilder
+                                         *     original command List
+                                         *
+                                         * Replace the command list before invoking
+                                         * the ProcessBuilder constructor.
+                                         */
+                                        super.visitMethodInsn(
+                                                Opcodes.INVOKESTATIC,
+                                                AGENT_INTERNAL_NAME,
+                                                "prepareAapt2Command",
+                                                "(Ljava/util/List;)Ljava/util/List;",
+                                                false
+                                        );
+                                    }
+
+                                    super.visitMethodInsn(
+                                            opcode,
+                                            owner,
+                                            methodName,
+                                            methodDescriptor,
+                                            isInterface
                                     );
                                 }
                             };
@@ -155,10 +210,15 @@ public final class DroidForgeAapt2Agent {
                                 "[DroidForge AAPT2 Agent] "
                                         + "Patched Aapt2FromMaven Companion"
                         );
-                    } else {
+                    } else if (DAEMON_SERVICE_CLASS.equals(className)) {
                         System.err.println(
                                 "[DroidForge AAPT2 Agent] "
                                         + "Patched Aapt2DaemonBuildService"
+                        );
+                    } else {
+                        System.err.println(
+                                "[DroidForge AAPT2 Agent] "
+                                        + "Patched Aapt2DaemonImpl process launch"
                         );
                     }
 
@@ -176,5 +236,43 @@ public final class DroidForgeAapt2Agent {
                 }
             }
         });
+    }
+
+    public static List<String> prepareAapt2Command(
+            List<String> originalCommand
+    ) {
+        if (
+                originalCommand == null
+                        || originalCommand.isEmpty()
+        ) {
+            return originalCommand;
+        }
+
+        String executable = originalCommand.get(0);
+
+        if (
+                executable == null
+                        || !executable.endsWith(PACKAGED_AAPT2_FILENAME)
+        ) {
+            return originalCommand;
+        }
+
+        ArrayList<String> wrappedCommand =
+                new ArrayList<>(originalCommand.size() + 2);
+
+        wrappedCommand.add(ANDROID_LINKER);
+        wrappedCommand.add(executable);
+        wrappedCommand.add(executable);
+
+        for (int index = 1; index < originalCommand.size(); index++) {
+            wrappedCommand.add(originalCommand.get(index));
+        }
+
+        System.err.println(
+                "[DroidForge AAPT2 Agent] Launch command: "
+                        + wrappedCommand
+        );
+
+        return wrappedCommand;
     }
 }
