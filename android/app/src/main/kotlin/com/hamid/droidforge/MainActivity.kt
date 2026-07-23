@@ -63,20 +63,86 @@ class MainActivity : FlutterActivity() {
                 }
 
                 "getBundledAapt2ShimPath" -> {
-                    val packagedShim = java.io.File(
-                        applicationInfo.nativeLibraryDir,
-                        "libdroidforge_aapt2_shim.so"
-                    )
-
-                    if (!packagedShim.isFile || packagedShim.length() <= 0L) {
-                        result.error(
-                            "AAPT2_SHIM_NOT_FOUND",
-                            "Bundled AAPT2 shim not found or empty: " +
-                                packagedShim.absolutePath,
-                            null
+                    try {
+                        val packagedShim = java.io.File(
+                            applicationInfo.nativeLibraryDir,
+                            "libdroidforge_aapt2_shim.so"
                         )
-                    } else {
-                        result.success(packagedShim.absolutePath)
+
+                        if (!packagedShim.isFile || packagedShim.length() <= 0L) {
+                            throw java.io.FileNotFoundException(
+                                "Bundled AAPT2 shim not found or empty: " +
+                                    packagedShim.absolutePath
+                            )
+                        }
+
+                        val launcherDirectory = java.io.File(
+                            filesDir,
+                            "DroidForge/runtime-tools"
+                        )
+
+                        if (!launcherDirectory.exists() &&
+                            !launcherDirectory.mkdirs()
+                        ) {
+                            throw java.io.IOException(
+                                "Unable to create AAPT2 launcher directory: " +
+                                    launcherDirectory.absolutePath
+                            )
+                        }
+
+                        val launcher = java.io.File(
+                            launcherDirectory,
+                            "aapt2"
+                        )
+
+                        val launcherPath = launcher.toPath()
+
+                        if (
+                            launcher.exists() ||
+                            java.nio.file.Files.isSymbolicLink(launcherPath)
+                        ) {
+                            java.nio.file.Files.deleteIfExists(launcherPath)
+                        }
+
+                        android.system.Os.symlink(
+                            packagedShim.absolutePath,
+                            launcher.absolutePath
+                        )
+
+                        if (!java.nio.file.Files.isSymbolicLink(launcherPath)) {
+                            throw java.io.IOException(
+                                "AAPT2 launcher was not created as a symbolic link: " +
+                                    launcher.absolutePath
+                            )
+                        }
+
+                        val linkedTarget = android.system.Os.readlink(
+                            launcher.absolutePath
+                        )
+
+                        if (linkedTarget != packagedShim.absolutePath) {
+                            throw java.io.IOException(
+                                "AAPT2 launcher points to unexpected target: " +
+                                    linkedTarget
+                            )
+                        }
+
+                        if (
+                            launcher.canonicalPath !=
+                            packagedShim.canonicalPath
+                        ) {
+                            throw java.io.IOException(
+                                "AAPT2 launcher canonical target mismatch"
+                            )
+                        }
+
+                        result.success(launcher.absolutePath)
+                    } catch (error: Throwable) {
+                        result.error(
+                            "AAPT2_LAUNCHER_FAILED",
+                            error.message ?: error.javaClass.simpleName,
+                            error.stackTraceToString()
+                        )
                     }
                 }
 
