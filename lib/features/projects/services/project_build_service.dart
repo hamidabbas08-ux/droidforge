@@ -103,6 +103,12 @@ class ProjectBuildService {
     final gradleLauncher = File(
       '$gradlePath/lib/gradle-launcher-$activeGradleVersion.jar',
     );
+
+    final gradleInstrumentationAgent = File(
+      '$gradlePath/lib/agents/'
+      'gradle-instrumentation-agent-$activeGradleVersion.jar',
+    );
+
     final javaExecutable = File('$jdkPath/bin/java');
     final javacExecutable = File('$jdkPath/bin/javac');
 
@@ -115,6 +121,13 @@ class ProjectBuildService {
     if (!await gradleLauncher.exists()) {
       throw StateError(
         'Gradle launcher JAR is missing: ${gradleLauncher.path}',
+      );
+    }
+
+    if (!await gradleInstrumentationAgent.exists()) {
+      throw StateError(
+        'Gradle instrumentation agent is missing: '
+        '${gradleInstrumentationAgent.path}',
       );
     }
 
@@ -182,6 +195,7 @@ class ProjectBuildService {
       '-Duser.country',
       '-Duser.language=en',
       '-Duser.variant',
+      '-javaagent:${gradleInstrumentationAgent.path}',
     ];
 
     await _writeAndroidGradleProperties(projectDirectory);
