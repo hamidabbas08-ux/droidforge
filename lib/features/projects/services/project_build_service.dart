@@ -63,6 +63,7 @@ class ProjectBuildService {
 
     await _validateProject(projectDirectory);
     await _ensureProjectRepositories(projectDirectory);
+    await _ensureProjectSdkVersions(projectDirectory);
 
     onProgress('Checking JDK', 0.12);
 
@@ -586,6 +587,23 @@ dependencyResolutionManagement {
     settingsText = repositoryConfiguration + settingsText;
 
     await settingsFile.writeAsString(settingsText);
+  }
+
+  Future<void> _ensureProjectSdkVersions(Directory projectDirectory) async {
+    final appBuildFile = File('${projectDirectory.path}/app/build.gradle.kts');
+
+    var buildText = await appBuildFile.readAsString();
+
+    buildText = buildText
+        .replaceAll(
+          'buildToolsVersion = "34.0.0"',
+          'buildToolsVersion = "35.0.0"',
+        )
+        .replaceAll('buildToolsVersion = "34"', 'buildToolsVersion = "35.0.0"')
+        .replaceAll('compileSdk = 34', 'compileSdk = 35')
+        .replaceAll('targetSdk = 34', 'targetSdk = 35');
+
+    await appBuildFile.writeAsString(buildText);
   }
 
   Future<void> _validateProject(Directory projectDirectory) async {
